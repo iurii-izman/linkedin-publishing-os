@@ -1,0 +1,46 @@
+version: 1
+positioning:
+  primary: "Systems analyst for CRM, integrations and process automation"
+  secondary: "Bitrix24 and 1C integration"
+  differentiator: "Applied AI automation with explicit human control"
+pillars:
+  - {id: crm_bitrix24, target_share: 0.30}
+  - {id: integrations_data_quality, target_share: 0.30}
+  - {id: systems_analysis_acceptance, target_share: 0.20}
+  - {id: applied_ai_automation, target_share: 0.20}
+languages:
+  allowed: [ru, en]
+  default: en
+  english_level: B2
+format:
+  default_hashtag_max: 3
+  default_link_max: 1
+  require_single_main_idea: true
+  require_micro_proof: true
+  require_practical_conclusion: true
+approval:
+  mandatory: true
+  invalidate_on: [text_change, asset_change, language_change, visibility_change]
+hard_fail:
+  - unsupported_claim
+  - unverified_metric
+  - portfolio_as_commercial
+  - confidential_data
+  - secret_pattern
+  - client_name_without_public_permission
+  - browser_automation_promotion
+  - autonomous_engagement_promotion
+style_avoid:
+  - "AI is changing everything"
+  - "In today's rapidly changing world"
+  - "I'm thrilled to announce"
+  - "game changer"
+  - "revolutionary"
+  - "10x"
+  - "comment YES"
+  - "agree?"
+source_rules:
+  external_source_is_not_owner_experience: true
+  private_source_requires_public_allowance: true
+  portfolio_requires_qualifier: true
+  unverified_claims_publishable: false

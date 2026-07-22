@@ -1,0 +1,71 @@
+version: 1
+owner: Iurii Izman
+sources:
+  cv: Iurii_Izman_CV_Bitrix24_AI(2).pdf
+  github: https://github.com/iurii-izman/
+  certifications: https://github.com/iurii-izman/professional-certifications
+claims:
+  - id: commercial.profile.six_plus_years
+    class: COMMERCIAL_VERIFIED
+    ru: "Более 6 лет коммерческого опыта в анализе CRM, интеграций и автоматизации."
+    en: "More than 6 years of commercial experience in CRM, integration and process automation analysis."
+    forbidden_inferences: ["6+ years as an AI engineer", "6+ years of production AI development"]
+  - id: commercial.axelsoft.full_cycle
+    class: COMMERCIAL_VERIFIED
+    ru: "В AXELSOFT вёл CRM-задачи от обследования и требований до постановки разработчикам, проверки результата и сопровождения пользователей."
+    en: "At AXELSOFT, handled CRM work from discovery and requirements through developer handoff, functional verification and user support."
+    period: "2023-04/2026-06"
+  - id: commercial.integrations.bitrix24_1c
+    class: COMMERCIAL_VERIFIED
+    ru: "Проектировал и сопровождал интеграции Битрикс24 с 1С, сайтами, формами, телефонией, почтой, базами данных и внутренними системами."
+    en: "Designed and supported Bitrix24 integrations with 1C, websites, forms, telephony, email, databases and internal systems."
+  - id: commercial.integrations.mapping_errors
+    class: COMMERCIAL_VERIFIED
+    ru: "Описывал карты полей, правила синхронизации, ошибки, исключения и требования к сопровождению."
+    en: "Documented field mappings, synchronization rules, error scenarios, exceptions and support requirements."
+  - id: commercial.automation.manual_operations
+    class: COMMERCIAL_VERIFIED
+    ru: "Автоматизировал обработку заявок, контроль заполненности, дедупликацию, автозаполнение и маршрутизацию."
+    en: "Automated lead intake, completeness checks, duplicate control, field auto-fill and routing."
+    forbidden_inferences: ["specific percentage reduction", "specific hours saved"]
+  - id: commercial.richcode.25_plus
+    class: COMMERCIAL_VERIFIED
+    ru: "За три года участвовал в 25+ проектах внедрения Битрикс24 в e-commerce, услугах, производстве и торговле."
+    en: "Worked across 25+ Bitrix24 implementation projects in e-commerce, services, manufacturing and trade over three years."
+  - id: commercial.analysis.as_is_to_be
+    class: COMMERCIAL_VERIFIED
+    ru: "Проводил AS-IS/TO-BE обследования, выявлял ручные операции, потери данных, дубли и узкие места."
+    en: "Conducted AS-IS/TO-BE analysis to identify manual operations, data loss, duplicates and bottlenecks."
+  - id: portfolio.ai_lead_intake.prototype
+    class: PORTFOLIO_VERIFIED
+    ru: "AI Lead Intake for Bitrix24 — публичный demo/product prototype для приёма, классификации, маршрутизации и human review заявок."
+    en: "AI Lead Intake for Bitrix24 is a public demo/product prototype for intake, classification, routing and human review."
+    url: https://github.com/iurii-izman/ai-lead-intake-bitrix24
+    required_qualifiers: [prototype_or_demo, not_commercial_deployment]
+    forbidden_inferences: [client_production, measured_business_outcome]
+  - id: portfolio.ai_lead_intake.test_portal
+    class: PORTFOLIO_VERIFIED
+    ru: "Проверен путь синхронизации с реальным тестовым порталом Битрикс24 при mock AI provider."
+    en: "The Bitrix24 synchronization path was validated against a real test portal with a mock AI provider."
+    url: https://github.com/iurii-izman/ai-lead-intake-bitrix24
+    forbidden_inferences: [production_portal, openai_path_fully_validated]
+  - id: portfolio.communication_summary.prototype
+    class: PORTFOLIO_VERIFIED
+    ru: "Bitrix24 Communication Summary Agent — public prototype для summary, рисков, next steps, follow-up задач и timeline-комментариев с human review."
+    en: "Bitrix24 Communication Summary Agent is a public prototype for summaries, risks, next steps, follow-up tasks and timeline comments with human review."
+    url: https://github.com/iurii-izman/bitrix24-communication-summary-agent
+  - id: certificate.system_business_analyst_1c
+    class: CERTIFICATE_VERIFIED
+    ru: "Есть сертификат 1С по системному и бизнес-анализу."
+    en: "Holds a 1C certificate in systems and business analysis."
+  - id: certificate.bpmn
+    class: CERTIFICATE_VERIFIED
+    ru: "Есть сертификат по моделированию и оптимизации процессов в BPMN."
+    en: "Holds a certificate in BPMN process modeling and optimization."
+global_forbidden_claims:
+  - commercial_production_ai_deployment
+  - trained_machine_learning_models
+  - managed_large_engineering_team
+  - owned_budgets
+  - guaranteed_business_metrics
+  - client_names_not_explicitly_public

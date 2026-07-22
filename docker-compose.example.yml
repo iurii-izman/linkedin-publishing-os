@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: publisher
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: publisher
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U publisher -d publisher"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  publisher-api:
+    build: {context: .}
+    env_file: [.env]
+    depends_on:
+      postgres: {condition: service_healthy}
+    volumes: [asset_data:/var/lib/publisher/assets]
+    expose: ["8000"]
+    restart: unless-stopped
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:PIN_A_VERSION
+    env_file: [.env]
+    environment:
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "336"
+    volumes: [n8n_data:/home/node/.n8n]
+    depends_on:
+      postgres: {condition: service_healthy}
+    expose: ["5678"]
+    restart: unless-stopped
+volumes:
+  postgres_data:
+  n8n_data:
+  asset_data:
