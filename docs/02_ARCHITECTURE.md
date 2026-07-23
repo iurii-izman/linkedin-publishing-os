@@ -158,3 +158,19 @@ Recovery from `FINAL_REQUEST_STARTED` without response becomes `PUBLISH_UNCERTAI
 - LLM unavailable: approved drafts still publish.
 
 A future web UI must consume the same API and introduce no new domain rules.
+
+## 11. Stage 0 exception
+
+The feasibility harness is intentionally smaller than the production topology:
+
+- one FastAPI process;
+- in-memory one-time OAuth state;
+- encrypted local connection file outside Git;
+- owner-invoked text/image CLI;
+- no PostgreSQL, n8n, Telegram, scheduler, LLM or outbox.
+
+It is not a partial Stage 1 implementation. Outstanding states are lost on restart,
+which is acceptable only for the single-owner spike. See ADR-009.
+
+In production, n8n owns the timer trigger only. `publisher-api` owns due-job
+acquisition, retry classification and all LinkedIn calls. See ADR-010.

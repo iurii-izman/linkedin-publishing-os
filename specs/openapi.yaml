@@ -11,7 +11,10 @@ paths:
   /health:
     get:
       security: []
-      responses: {"200": {description: Process alive}}
+      responses:
+        "200":
+          description: Process alive
+          content: {application/json: {schema: {$ref: "#/components/schemas/Health"}}}
   /ready:
     get:
       security: []
@@ -19,6 +22,8 @@ paths:
   /v1/oauth/linkedin/start:
     post:
       summary: Create one-time OAuth URL
+      security:
+        - Stage0OwnerKey: []
       responses:
         "200":
           description: URL
@@ -30,6 +35,8 @@ paths:
                 properties:
                   authorization_url: {type: string, format: uri}
                   expires_at: {type: string, format: date-time}
+        "401":
+          description: Invalid Stage 0 owner key
   /v1/oauth/linkedin/callback:
     get:
       security: []
@@ -37,7 +44,14 @@ paths:
         - {in: query, name: code, schema: {type: string}}
         - {in: query, name: state, required: true, schema: {type: string}}
         - {in: query, name: error, schema: {type: string}}
-      responses: {"200": {description: Completed}, "400": {description: Invalid callback}}
+        - {in: query, name: error_description, schema: {type: string}}
+      description: Exactly one of code or error is expected. State is always consumed once.
+      responses:
+        "200":
+          description: Completed without returning a token
+          content: {application/json: {schema: {$ref: "#/components/schemas/OAuthSafeResult"}}}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "502": {$ref: "#/components/responses/UpstreamFailure"}
   /v1/integrations/linkedin/status:
     get:
       responses:
@@ -50,6 +64,16 @@ paths:
         required: true
         content: {application/json: {schema: {$ref: "#/components/schemas/SourceCreate"}}}
       responses: {"201": {description: Created}, "200": {description: Duplicate returned}}
+  /v1/content-items:
+    post:
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/ContentItemCreate"}}}
+      responses:
+        "201": {description: Created}
+        "200": {description: Existing item returned for the same idempotency key}
+        "409": {$ref: "#/components/responses/Conflict"}
   /v1/evidence-packs:
     post:
       requestBody:
@@ -71,7 +95,9 @@ paths:
       responses: {"200": {description: QA finalized}, "409": {description: Invalid state}}
   /v1/drafts/{draft_id}/approve:
     post:
-      parameters: [{$ref: "#/components/parameters/DraftId"}]
+      parameters:
+        - {$ref: "#/components/parameters/DraftId"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
       requestBody:
         required: true
         content: {application/json: {schema: {$ref: "#/components/schemas/ApprovalRequest"}}}
@@ -82,6 +108,7 @@ paths:
       responses: {"200": {description: Rejected}, "409": {description: Invalid state}}
   /v1/publication-jobs:
     post:
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
       requestBody:
         required: true
         content: {application/json: {schema: {$ref: "#/components/schemas/PublicationJobCreate"}}}
@@ -121,10 +148,51 @@ paths:
 components:
   securitySchemes:
     ServiceToken: {type: http, scheme: bearer}
+    Stage0OwnerKey: {type: apiKey, in: header, name: X-Stage0-Owner-Key}
   parameters:
     DraftId: {in: path, name: draft_id, required: true, schema: {type: string, format: uuid}}
     JobId: {in: path, name: job_id, required: true, schema: {type: string, format: uuid}}
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema: {type: string, minLength: 16, maxLength: 128}
+  responses:
+    BadRequest:
+      description: Invalid request
+      content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
+    Conflict:
+      description: State or idempotency conflict
+      content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
+    UpstreamFailure:
+      description: Safe upstream failure without credentials or raw body
+      content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
   schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, const: ok}
+    Error:
+      type: object
+      required: [code, message, correlation_id]
+      additionalProperties: false
+      properties:
+        code: {type: string}
+        message: {type: string}
+        correlation_id: {type: string}
+        details: {type: object}
+    OAuthSafeResult:
+      type: object
+      required: [status, expires_at, granted_scopes, author_urn, api_version]
+      additionalProperties: false
+      properties:
+        status: {type: string, enum: [connected_for_stage0, CONNECTED]}
+        expires_at: {type: string, format: date-time}
+        granted_scopes: {type: array, items: {type: string}}
+        author_urn: {type: string, pattern: "^urn:li:person:"}
+        api_version: {type: string, pattern: "^[0-9]{6}$"}
+        requires_live_author_validation: {type: boolean}
     IntegrationStatus:
       type: object
       required: [status, api_version, capabilities]
@@ -146,19 +214,29 @@ components:
         trust_level: {type: integer, minimum: 0, maximum: 5}
         visibility: {type: string, enum: [PUBLIC, INTERNAL, PRIVATE]}
         metadata: {type: object}
+    ContentItemCreate:
+      type: object
+      required: [topic, pillar, primary_source_id]
+      additionalProperties: false
+      properties:
+        topic: {type: string, minLength: 1}
+        pillar: {type: string, minLength: 1}
+        primary_source_id: {type: string, format: uuid}
+        scores: {type: object}
+        risk_notes: {type: array, items: {type: string}}
     EvidencePackCreate:
       type: object
-      required: [content_item_id, language, allowed_claim_keys, source_ids]
+      required: [content_item_id, language, allowed_claim_ids, source_ids]
       properties:
         content_item_id: {type: string, format: uuid}
         language: {type: string, enum: [ru, en]}
-        allowed_claim_keys: {type: array, items: {type: string}}
+        allowed_claim_ids: {type: array, items: {type: string}}
         forbidden_claim_keys: {type: array, items: {type: string}}
         source_ids: {type: array, items: {type: string, format: uuid}}
         warnings: {type: array, items: {type: string}}
     DraftCreate:
       type: object
-      required: [content_item_id, evidence_pack_id, language, pillar, full_text, structured_content, used_claim_keys]
+      required: [content_item_id, evidence_pack_id, language, pillar, full_text, structured_content, used_claim_ids]
       properties:
         content_item_id: {type: string, format: uuid}
         evidence_pack_id: {type: string, format: uuid}
@@ -167,7 +245,7 @@ components:
         pillar: {type: string}
         full_text: {type: string, minLength: 1}
         structured_content: {type: object}
-        used_claim_keys: {type: array, items: {type: string}}
+        used_claim_ids: {type: array, items: {type: string}}
     QaSubmission:
       type: object
       required: [deterministic_result, deterministic_report, final_result]
@@ -183,7 +261,7 @@ components:
       properties:
         asset_id: {type: [string, "null"], format: uuid}
         approved_by: {type: string}
-        accept_warnings: {type: array, items: {type: string}}
+        accepted_warning_codes: {type: array, items: {type: string}}
     PublicationJobCreate:
       type: object
       required: [approval_id, scheduled_at, visibility]

@@ -90,3 +90,12 @@ docs-links
 ```
 
 No live LinkedIn secret in CI.
+
+## 10. Stage 0 harness coverage
+
+The isolated harness uses `httpx.MockTransport`; no test resolves or calls a real
+LinkedIn endpoint. Coverage includes settings, OAuth state entropy/expiry/replay,
+callback denial/missing code, token parsing/encrypted storage/redaction, UserInfo,
+person URN construction, text/image request contracts, upload-host validation,
+201/post URN, 400/401/403/409/426/429/500/503, pre-send connect timeout, ambiguous
+final timeout and mandatory live confirmation.

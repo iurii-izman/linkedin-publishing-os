@@ -2,9 +2,10 @@
 
 ## Stage 0
 
-- [ ] no secret committed;
+- [x] safe harness, mock tests and manual guide prepared;
+- [x] no secret committed (pattern scan and ignored local secret paths);
 - [ ] products/scopes recorded;
-- [ ] OAuth state validated;
+- [x] OAuth state entropy, expiry and replay validated with mocks;
 - [ ] token lifetime observed;
 - [ ] author URN validated;
 - [ ] `/rest/posts` tested;

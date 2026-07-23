@@ -44,3 +44,5 @@ source_rules:
   private_source_requires_public_allowance: true
   portfolio_requires_qualifier: true
   unverified_claims_publishable: false
+  require_verification_status: VERIFIED
+  candidate_seed_is_not_active_evidence: true

@@ -17,6 +17,11 @@ Output:
 
 `NO_GO` changes the product to draft-and-reminder mode. It never triggers browser automation.
 
+Stage 0 implementation is an isolated spike, not the Stage 1 foundation. Text
+publication is the required GO signal. If text succeeds but image access is
+unavailable, the owner may record `GO_WITH_LIMITATIONS`; media remains blocked until
+separately validated.
+
 ## Stage 1 — Foundation and reliable text
 
 1. Repo, settings, health, PostgreSQL, Alembic and CI.

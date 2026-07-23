@@ -58,6 +58,9 @@ urn:li:person:{person_id}
 
 Person IDs are application-specific.
 
+Construction of a syntactically valid candidate URN is not proof it is accepted.
+The real text smoke is the capability test; a 403 stops the task for owner review.
+
 ## 5. Versioning
 
 Preferred base:
@@ -75,7 +78,8 @@ X-Restli-Protocol-Version: 2.0.0
 Content-Type: application/json
 ```
 
-`202607` is the latest observed official version on 23 July 2026. It is configuration.
+`202607` is the official July 2026 version on 23 July 2026. It is configuration and
+must still be confirmed against the actual application/endpoints.
 
 ## 6. Text post
 
@@ -104,7 +108,7 @@ Conceptual body:
 
 Success is HTTP `201` with post ID in `x-restli-id`. A 201 without usable ID is an anomaly.
 
-## 7. Legacy fallback
+## 7. Legacy diagnostic
 
 The self-service guide also documents:
 
@@ -112,11 +116,13 @@ The self-service guide also documents:
 POST /v2/ugcPosts
 ```
 
-Selection rule:
+The current Posts API says it replaces `ugcPosts`, while the self-service Share guide
+still documents the legacy endpoint. Selection rule:
 
 1. test `/rest/posts`;
 2. use it when accepted;
-3. use legacy only as a documented temporary fallback;
+3. consider legacy only after an explicit owner decision and a clear pre-send
+   rejection;
 4. never run both paths for one job;
 5. no fallback after an ambiguous final request.
 
@@ -131,6 +137,9 @@ Selection rule:
 7. create final post with image URN;
 8. store post URN;
 9. remove upload URL from logs.
+
+Only accept the documented HTTPS LinkedIn upload host/path. Stage 0 holds the URL in
+memory only. Production encrypts it temporarily and deletes it after use or expiry.
 
 Alt text is generated and reviewable.
 

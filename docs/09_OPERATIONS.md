@@ -15,6 +15,17 @@ backup job
 
 Pin versions. Do not use floating `latest` in production.
 
+`docker-compose.example.yml` demonstrates separate least-privilege `publisher` and
+`n8n` databases/users. Its placeholder secrets must be replaced before use. The
+current `publisher-api` image exposes only the Stage 0 harness; this Compose file is
+not evidence of a production deployment.
+
+n8n 2.30.5 starts its bundled JavaScript runner but the official image reports that
+an internal Python runner is unavailable. Stage 0 uses neither. Before any future
+Code-node workflow is admitted, Stage 2 must choose and harden the documented
+external task-runner topology; this example does not claim production runner
+readiness.
+
 ## 2. Environments
 
 At least local development and production. Live tests use clearly labeled controlled posts; configuration and secrets are separate.

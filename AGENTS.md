@@ -34,6 +34,8 @@ This repository implements a single-user LinkedIn publishing system. Read this f
 - State transitions must be explicit and transactionally enforced.
 - Final post creation must be protected by a database lock and publication fingerprint.
 - Any change to contracts requires updating docs, tests, and schemas in the same change.
+- The isolated Stage 0 feasibility harness may use in-memory OAuth state and an
+  encrypted ignored local connection file; it must not be reused as Stage 1 state.
 
 ## Development rules
 
@@ -55,6 +57,8 @@ ruff format --check .
 mypy .
 pytest -q
 ```
+
+When a lock file is present, run these through `uv run` after `uv sync --frozen --dev`.
 
 When API contracts or migrations change:
 

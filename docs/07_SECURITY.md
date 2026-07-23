@@ -57,6 +57,10 @@ Pinned dependencies, lock file, secret scan, dependency scan, container scan and
 
 URL allowlists, block private network for generic fetch, validate LinkedIn upload hosts and avoid generic proxy endpoints.
 
+For current Stage 0 image upload, accept only HTTPS URLs with host
+`www.linkedin.com` and path prefix `/dms-uploads/`. Do not follow a returned upload
+URL to another host.
+
 ### Malicious files
 
 MIME/extension/size validation, PDF structural validation, no macro-enabled documents and optional antivirus scan.
@@ -80,6 +84,10 @@ v1:<key-id>:<base64-ciphertext>
 ```
 
 Plaintext exists only immediately before the API call.
+
+Production ciphertext authenticates integration identity as associated data and
+includes a key ID for rotation (ADR-011). The Stage 0 Fernet file is a disposable
+spike boundary and is never imported into the production database (ADR-009).
 
 ## 6. Logging
 

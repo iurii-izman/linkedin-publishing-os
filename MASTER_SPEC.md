@@ -129,7 +129,7 @@ Raw n8n HTTP nodes are acceptable for the Stage 0 feasibility spike. They are no
 
 ## 7. Stage 0 feasibility gate
 
-No production implementation begins until a real LinkedIn application proves:
+No Stage 1 publication implementation begins until a real LinkedIn application proves:
 
 1. Sign in with LinkedIn using OpenID Connect can be enabled.
 2. Share on LinkedIn can be enabled.
@@ -137,11 +137,13 @@ No production implementation begins until a real LinkedIn application proves:
 4. the member identifier can form a valid person URN;
 5. one text post can be created;
 6. the post ID/URN is captured;
-7. one image can be initialized, uploaded and attached;
+7. image initialization/upload is attempted when the app permits it; an unavailable
+   image capability is recorded and may produce `GO_WITH_LIMITATIONS`;
 8. invalid/expired token behavior is observed;
 9. the actual API path is documented:
    - preferred: `POST /rest/posts`;
-   - temporary fallback: legacy `POST /v2/ugcPosts`, only if required by the app;
+   - legacy diagnostic only: `POST /v2/ugcPosts`, selected explicitly after a clear
+     pre-send `/rest/posts` rejection and never as an automatic fallback;
 10. current `Linkedin-Version` is confirmed.
 
 A failed gate does not justify browser automation. It changes scope to draft preparation and manual LinkedIn scheduling.
@@ -316,10 +318,11 @@ Protection:
 - post URN stored immediately;
 - ambiguous result routed to manual verification.
 
-## 11. LinkedIn baseline as of 23 July 2026
+## 11. LinkedIn documentation baseline as of 23 July 2026
 
 - open consumer product `Share on LinkedIn` grants `w_member_social`;
-- member authorization uses 3-legged OAuth;
+- member authorization uses 3-legged OAuth and a one-time application-generated
+  `state` even though the LinkedIn parameter table labels it optional;
 - documented access-token lifetime is 60 days, but code uses returned `expires_in`;
 - preferred base path is `/rest/`;
 - current official Marketing API version is `202607`;
@@ -328,7 +331,9 @@ Protection:
 - member analytics requires additional `r_member_postAnalytics` access;
 - `r_member_social` is restricted.
 
-The API version is configuration, never a permanent constant.
+The API version is configuration, never a permanent constant. These are verified
+documentation facts, not proof that the owner's application has the products,
+author identity or endpoint behavior. Those remain Stage 0 observations.
 
 ## 12. Security model
 

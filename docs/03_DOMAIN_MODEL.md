@@ -105,3 +105,15 @@ Examples:
 - safe attempt diagnostics: 180 days;
 - temporary upload URLs: remove after completion;
 - generated previews: 30 days unless published.
+
+## 8. Relational integrity
+
+Evidence-pack/source/claim and draft/claim membership uses normalized join tables.
+UUID arrays are not used for domain relationships because PostgreSQL cannot enforce
+element-level foreign keys on them. Draft versions and packs remain immutable after
+creation.
+
+The reference schema enforces that `PUBLISHED` has both post URN and timestamp and
+that a job has at most one incomplete attempt. Application commands must additionally
+enforce approved-draft scheduling and transition legality transactionally; reference
+DDL is not a substitute for Stage 1 migration and repository tests.

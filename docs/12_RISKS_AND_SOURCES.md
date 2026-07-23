@@ -31,13 +31,26 @@
 - no refresh token is assumed.
 - analytics access is not assumed.
 
+## 2.1 Fact classification
+
+- **Verified current fact:** supported directly by an official source below, accessed
+  23 July 2026.
+- **Real-portal observation:** must be recorded by the owner in
+  `docs/feasibility_report.md`.
+- **Implementation decision:** repository behavior chosen in the master spec/ADRs.
+- **Deferred capability:** not implemented or requested during Stage 0.
+
+Documentation verification never upgrades a real-portal observation to confirmed.
+
 ## 3. Official source registry
+
+**Access date for every URL in this registry: 23 July 2026.**
 
 ### Access and OAuth
 
 - https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access
 - https://learn.microsoft.com/en-us/linkedin/shared/authentication/authentication
-- https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow-native
+- https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow
 - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2
 - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin
 
@@ -63,15 +76,34 @@
 ### n8n
 
 - https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.telegram/
+- https://docs.n8n.io/integrations/builtin/trigger-nodes/n8n-nodes-base.telegramtrigger/
+- https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.linkedin/
 - https://docs.n8n.io/hosting/securing/security-audit/
 - https://docs.n8n.io/hosting/scaling/external-storage/
+- https://docs.n8n.io/hosting/configuration/environment-variables/executions/
+- https://docs.n8n.io/hosting/configuration/configuration-examples/encryption-key/
+- https://docs.n8n.io/source-control-environments/create-environments/
 
 ## 4. Candidate evidence
 
-- current supplied CV;
+- CV reference named in `data/candidate_evidence_seed.yaml` (not bundled; owner
+  verification required);
 - https://github.com/iurii-izman/
 - https://github.com/iurii-izman/professional-certifications
 - https://github.com/iurii-izman/ai-lead-intake-bitrix24
 - https://github.com/iurii-izman/bitrix24-communication-summary-agent
 
 For every migration record access date, selected docs version, endpoint, scope, fixture and live-smoke result.
+
+## 5. Verified results versus remaining observations
+
+| Area | Verified from official documentation | Still requires Stage 0 |
+|---|---|---|
+| Products/scopes | OIDC profile access and Share `w_member_social` are open consumer permissions | Actual app products/scopes |
+| OAuth | exact redirect, code flow, state comparison, `expires_in`; programmatic refresh is limited | returned fields and expiry |
+| Identity | UserInfo returns pairwise `sub` | accepted person URN |
+| Posts | `/rest/posts`, headers, 201, `x-restli-id`; Posts replaces ugcPosts | personal member behavior |
+| Version | July 2026 header is `202607` | actual endpoint acceptance |
+| Images | initialize/upload/status/final post flow | actual member image access |
+| Analytics | `r_member_postAnalytics` belongs to restricted Community Management access | deferred; not an MVP gate |
+| n8n | Telegram callback answer, audit and pruning/storage controls exist | Stage 2 workflow behavior |

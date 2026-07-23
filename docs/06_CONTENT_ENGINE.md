@@ -89,6 +89,12 @@ External sources give context, not owner experience.
 
 Private sources require explicit public-safety review and abstraction.
 
+`data/candidate_evidence_seed.yaml` is an import candidate, not active evidence.
+Every item must be matched to present source material and changed to
+`verification_status: VERIFIED` through an audited owner review before a pack may
+select it. A claim class ending in `_VERIFIED` describes the eventual evidence type;
+it does not override a pending verification status.
+
 ## 10. Similarity
 
 Compare opening, semantic similarity, claim combination, pillar and closing against prior 90 days. High similarity is a warning before approval.

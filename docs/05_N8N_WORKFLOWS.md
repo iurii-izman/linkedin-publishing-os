@@ -152,3 +152,22 @@ Store exports under `n8n/workflows/` and a `workflow_manifest.yaml`.
 ## 14. Workflow acceptance
 
 Test happy path, replay, malformed input, API outage, unauthorized chat, duplicate callback, LLM rate limit, Telegram outage and secret redaction.
+
+## 15. Current platform notes (verified 23 July 2026)
+
+The built-in LinkedIn node supports a narrow create-post operation. It does not own
+the required production OAuth lifecycle, multi-step media state, final-request
+ambiguity handling or transactional publication lock. Production therefore calls
+`publisher-api`, not the LinkedIn node or a raw LinkedIn HTTP Request.
+
+The Telegram action node can answer callback queries from inline keyboards. Answer
+the query promptly, then call the idempotent API command.
+
+Use a fixed `N8N_ENCRYPTION_KEY`, enable execution pruning, avoid saving successful
+payloads where possible, and review binary retention. Workflow/version-control
+exports can expose workflow structure plus credential/variable stubs even when they
+do not contain decrypted credential values; keep the repository private and review
+every export.
+
+Run `n8n audit` and review credential, database, filesystem, risky-node and instance
+reports. Do not enable Execute Command or unreviewed community nodes.

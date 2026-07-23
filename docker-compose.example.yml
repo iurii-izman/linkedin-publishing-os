@@ -2,31 +2,74 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: publisher
-      POSTGRES_PASSWORD: change-me
-      POSTGRES_DB: publisher
-    volumes: [postgres_data:/var/lib/postgresql/data]
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_DB: postgres
+      PUBLISHER_DB_PASSWORD: ${PUBLISHER_DB_PASSWORD:?set PUBLISHER_DB_PASSWORD}
+      N8N_DB_PASSWORD: ${N8N_DB_PASSWORD:?set N8N_DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./ops/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U publisher -d publisher"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
   publisher-api:
     build: {context: .}
-    env_file: [.env]
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       postgres: {condition: service_healthy}
-    volumes: [asset_data:/var/lib/publisher/assets]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:?set APP_PUBLIC_URL}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      OAUTH_STATE_TTL_SECONDS: ${OAUTH_STATE_TTL_SECONDS:-900}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:?set LINKEDIN_CLIENT_ID}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:?set LINKEDIN_CLIENT_SECRET}
+      LINKEDIN_REDIRECT_URI: ${LINKEDIN_REDIRECT_URI:?set LINKEDIN_REDIRECT_URI}
+      LINKEDIN_API_BASE_URL: ${LINKEDIN_API_BASE_URL:-https://api.linkedin.com}
+      LINKEDIN_AUTHORIZATION_URL: ${LINKEDIN_AUTHORIZATION_URL:-https://www.linkedin.com/oauth/v2/authorization}
+      LINKEDIN_TOKEN_URL: ${LINKEDIN_TOKEN_URL:-https://www.linkedin.com/oauth/v2/accessToken}
+      LINKEDIN_USERINFO_URL: ${LINKEDIN_USERINFO_URL:-https://api.linkedin.com/v2/userinfo}
+      LINKEDIN_API_VERSION: ${LINKEDIN_API_VERSION:?set LINKEDIN_API_VERSION}
+      LINKEDIN_RESTLI_VERSION: ${LINKEDIN_RESTLI_VERSION:-2.0.0}
+      LINKEDIN_SCOPES: ${LINKEDIN_SCOPES:-openid profile w_member_social}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:?set TOKEN_ENCRYPTION_KEY}
+      STAGE0_OWNER_KEY: ${STAGE0_OWNER_KEY:?set STAGE0_OWNER_KEY}
+      STAGE0_TOKEN_STORE_PATH: /var/lib/publisher/stage0/linkedin-connection.enc
+    volumes:
+      - publisher_stage0_data:/var/lib/publisher/stage0
+    command: ["uvicorn", "publisher_api.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
     expose: ["8000"]
     restart: unless-stopped
   n8n:
-    image: docker.n8n.io/n8nio/n8n:PIN_A_VERSION
-    env_file: [.env]
+    image: docker.n8n.io/n8nio/n8n:2.30.5
+    env_file:
+      - path: .env
+        required: false
     environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASSWORD:?set N8N_DB_PASSWORD}
       EXECUTIONS_DATA_PRUNE: "true"
       EXECUTIONS_DATA_MAX_AGE: "336"
-    volumes: [n8n_data:/home/node/.n8n]
+      N8N_DEFAULT_BINARY_DATA_MODE: filesystem
+      N8N_UNVERIFIED_PACKAGES_ENABLED: "false"
+      N8N_RUNNERS_TASK_TIMEOUT: "60"
+      N8N_COMPRESSION_NODE_MAX_DECOMPRESSED_SIZE_BYTES: "268435456"
+      N8N_COMPRESSION_NODE_MAX_ZIP_ENTRIES: "1000"
+      N8N_HOST: ${N8N_HOST:?set N8N_HOST}
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-https}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?set N8N_ENCRYPTION_KEY}
+    volumes:
+      - n8n_data:/home/node/.n8n
     depends_on:
       postgres: {condition: service_healthy}
     expose: ["5678"]
@@ -34,4 +77,4 @@ services:
 volumes:
   postgres_data:
   n8n_data:
-  asset_data:
+  publisher_stage0_data:

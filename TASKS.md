@@ -4,6 +4,15 @@ Status: `[ ]` not started · `[-]` in progress · `[x]` complete · `[!]` blocke
 
 ## EPIC 0 — LinkedIn API feasibility gate
 
+### Stage 0 preparation (repository work)
+
+- [x] Audit specification pack and current official documentation.
+- [x] Add isolated FastAPI OAuth callback and encrypted local connection store.
+- [x] Add dry request preparation and explicit live-publish confirmation.
+- [x] Add mocked text/image/error/timeout/redaction tests.
+- [x] Add owner manual-action guide and feasibility report template.
+- [ ] Owner executes real Developer Portal/OAuth/post observations.
+
 ### LPOS-001 Developer application and products
 
 - [ ] Create LinkedIn developer application.
@@ -16,17 +25,18 @@ Status: `[ ]` not started · `[-]` in progress · `[x]` complete · `[!]` blocke
 
 ### LPOS-002 OAuth smoke
 
-- [ ] Implement temporary callback.
+- [x] Implement temporary callback.
 - [ ] Request `openid profile w_member_social`.
-- [ ] Validate one-time `state`.
-- [ ] Exchange authorization code.
-- [ ] Record `expires_in`.
-- [ ] Retrieve UserInfo.
-- [ ] Validate author person URN.
+- [x] Validate one-time `state` in code and mock tests.
+- [x] Implement authorization-code exchange.
+- [ ] Record real `expires_in`.
+- [x] Implement UserInfo retrieval.
+- [ ] Validate the real author person URN.
 - [ ] Record 401 behavior.
 
 ### LPOS-003 Text post smoke
 
+- [x] Implement dry request and guarded one-shot `/rest/posts` command.
 - [ ] Test `POST /rest/posts` with configurable version.
 - [ ] Capture HTTP status and `x-restli-id`.
 - [ ] Verify post manually.
@@ -35,6 +45,7 @@ Status: `[ ]` not started · `[-]` in progress · `[x]` complete · `[!]` blocke
 
 ### LPOS-004 Image smoke
 
+- [x] Implement guarded initialize/upload/status/post path with synthetic fixtures.
 - [ ] Initialize image upload.
 - [ ] Upload synthetic image.
 - [ ] Create image post.
@@ -43,7 +54,7 @@ Status: `[ ]` not started · `[-]` in progress · `[x]` complete · `[!]` blocke
 
 ### LPOS-005 Gate decision
 
-- [ ] Write `docs/feasibility_report.md`.
+- [x] Create `docs/feasibility_report.md` template.
 - [ ] Mark `GO`, `GO_WITH_LIMITATIONS` or `NO_GO`.
 - [ ] Do not proceed on `NO_GO`.
 

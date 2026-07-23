@@ -16,7 +16,10 @@
 - **PostgreSQL** является единственным источником состояния;
 - публикация выполняется только через официальный LinkedIn API, без Playwright, Selenium, scraping и имитации действий в браузере.
 
-Сначала выполняется короткий **Stage 0 API Feasibility Spike**. Полная разработка начинается только после реального подтверждения OAuth, `w_member_social`, текстовой публикации и загрузки одного изображения.
+Сначала выполняется короткий **Stage 0 API Feasibility Spike**. Stage 1 начинается
+только после реального owner-operated подтверждения OAuth, `w_member_social` и
+текстовой публикации. Недоступность изображения должна быть записана как ограничение
+и может привести к `GO_WITH_LIMITATIONS`; она не может быть скрыта.
 
 ## Что входит в пакет
 
@@ -38,6 +41,9 @@
 | [`docs/11_CODEX_RUNBOOK.md`](docs/11_CODEX_RUNBOOK.md) | Как вести разработку с Codex |
 | [`docs/12_RISKS_AND_SOURCES.md`](docs/12_RISKS_AND_SOURCES.md) | Риски, допущения и официальный source registry |
 | [`docs/13_ACCEPTANCE_CHECKLISTS.md`](docs/13_ACCEPTANCE_CHECKLISTS.md) | Приёмочные чек-листы |
+| [`docs/00_SPEC_AUDIT_REPORT.md`](docs/00_SPEC_AUDIT_REPORT.md) | Фактический аудит пакета и исправления |
+| [`docs/STAGE0_MANUAL_ACTIONS.md`](docs/STAGE0_MANUAL_ACTIONS.md) | Ручные действия владельца для безопасного spike |
+| [`docs/feasibility_report.md`](docs/feasibility_report.md) | Шаблон фактических результатов Stage 0 |
 | [`specs/openapi.yaml`](specs/openapi.yaml) | Целевой внутренний HTTP API |
 | [`specs/schema.sql`](specs/schema.sql) | Референсная PostgreSQL-схема |
 | [`data/candidate_evidence_seed.yaml`](data/candidate_evidence_seed.yaml) | Начальная доказательная база для постов |
@@ -61,10 +67,22 @@
 1. Создать приватный репозиторий `linkedin-publishing-os`.
 2. Распаковать этот пакет в корень.
 3. Открыть репозиторий в Codex.
-4. Передать Codex файл [`prompts/00_REPOSITORY_KICKOFF.md`](prompts/00_REPOSITORY_KICKOFF.md).
-5. Выполнить только **Stage 0**.
-6. Зафиксировать фактические возможности LinkedIn в `docs/feasibility_report.md`.
-7. После успешного gate перейти к Stage 1.
+4. Скопировать `.env.example` в локальный `.env`, не добавляемый в Git.
+5. Выполнить `uv sync --frozen --dev`.
+6. Следовать [`docs/STAGE0_MANUAL_ACTIONS.md`](docs/STAGE0_MANUAL_ACTIONS.md).
+7. Зафиксировать фактические возможности LinkedIn в `docs/feasibility_report.md`.
+8. Только владелец может разрешить Stage 1 после `GO` или
+   `GO_WITH_LIMITATIONS`.
+
+Локальные проверки:
+
+```text
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy .
+uv run pytest -q
+uv run python scripts/validate_repository.py
+```
 
 ## Жёсткие ограничения
 
