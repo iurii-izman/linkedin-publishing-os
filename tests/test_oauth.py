@@ -17,6 +17,7 @@ from publisher_api.oauth import (
     OAuthStateError,
     OAuthTokenResponse,
 )
+from publisher_api.settings import normalize_scopes
 from publisher_api.token_store import EncryptedConnectionStore
 
 
@@ -58,6 +59,25 @@ def test_authorization_url_has_exact_scopes_and_state(settings_factory: object) 
     assert query["redirect_uri"] == [str(settings.linkedin_redirect_uri)]
 
 
+@pytest.mark.parametrize(
+    ("raw_scopes", "expected"),
+    [
+        ("openid profile w_member_social", ["openid", "profile", "w_member_social"]),
+        ("openid,profile,w_member_social", ["openid", "profile", "w_member_social"]),
+        ("openid%20profile%20w_member_social", ["openid", "profile", "w_member_social"]),
+        (["openid", "profile", "w_member_social"], ["openid", "profile", "w_member_social"]),
+        (
+            "openid profile email w_member_social",
+            ["openid", "profile", "email", "w_member_social"],
+        ),
+    ],
+)
+def test_normalize_scopes_accepts_linkedin_representations(
+    raw_scopes: str | list[str], expected: list[str]
+) -> None:
+    assert normalize_scopes(raw_scopes) == expected
+
+
 @pytest.mark.asyncio
 async def test_oauth_start_requires_owner_key(settings_factory: object) -> None:
     settings = settings_factory()  # type: ignore[operator]
@@ -86,6 +106,17 @@ def test_token_response_parses_documented_fields_without_exposing_token() -> Non
         }
     )
     assert token.expires_in == 5_184_000
+    assert "AQ-synthetic-secret-token-value" not in repr(token)
+
+
+def test_token_response_allows_scope_to_be_omitted_without_exposing_token() -> None:
+    token = OAuthTokenResponse.model_validate(
+        {
+            "access_token": "AQ-synthetic-secret-token-value",
+            "expires_in": 5_184_000,
+        }
+    )
+    assert token.scope is None
     assert "AQ-synthetic-secret-token-value" not in repr(token)
 
 
@@ -170,8 +201,20 @@ async def test_successful_callback_stores_encrypted_connection(
     assert stored.access_token.get_secret_value() == "AQ-synthetic-secret-token-value"
 
 
+@pytest.mark.parametrize(
+    "returned_scopes",
+    [
+        "openid,profile,w_member_social",
+        "openid%20profile%20w_member_social",
+        ["openid", "profile", "w_member_social"],
+        "openid profile email w_member_social",
+    ],
+)
 @pytest.mark.asyncio
-async def test_callback_rejects_missing_required_scope(settings_factory: object) -> None:
+async def test_callback_accepts_normalized_and_additional_granted_scopes(
+    settings_factory: object,
+    returned_scopes: str | list[str],
+) -> None:
     settings = settings_factory()  # type: ignore[operator]
     store = InMemoryOAuthStateStore()
     state = store.issue(900)
@@ -183,7 +226,173 @@ async def test_callback_rejects_missing_required_scope(settings_factory: object)
                 json={
                     "access_token": "AQ-synthetic-secret-token-value",
                     "expires_in": 3600,
-                    "scope": "openid profile",
+                    "scope": returned_scopes,
+                },
+            )
+        return httpx.Response(200, json={"sub": "member_123"})
+
+    app = create_app(settings, transport=httpx.MockTransport(handler), state_store=store)
+    async with app_client(app) as client:
+        response = await client.get(
+            "/v1/oauth/linkedin/callback",
+            params={"state": state.value, "code": "synthetic-code"},
+        )
+
+    assert response.status_code == 200
+    assert settings.stage0_token_store_path.exists()
+    assert set(response.json()["granted_scopes"]) >= {
+        "openid",
+        "profile",
+        "w_member_social",
+    }
+
+
+@pytest.mark.asyncio
+async def test_missing_token_scope_uses_successful_introspection(
+    settings_factory: object,
+) -> None:
+    settings = settings_factory()  # type: ignore[operator]
+    store = InMemoryOAuthStateStore()
+    state = store.issue(900)
+    introspection_seen = False
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal introspection_seen
+        if request.url.path.endswith("/accessToken"):
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "AQ-synthetic-secret-token-value",
+                    "expires_in": 3600,
+                },
+            )
+        if request.url.path.endswith("/introspectToken"):
+            introspection_seen = True
+            form = parse_qs(request.content.decode("ascii"))
+            assert request.method == "POST"
+            assert form["client_id"] == ["synthetic-client-id"]
+            assert form["client_secret"] == ["synthetic-client-secret"]
+            assert form["token"] == ["AQ-synthetic-secret-token-value"]
+            return httpx.Response(
+                200,
+                json={
+                    "active": True,
+                    "client_id": "synthetic-client-id",
+                    "expires_at": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
+                    "scope": "openid,profile,w_member_social",
+                },
+            )
+        return httpx.Response(200, json={"sub": "member_123"})
+
+    app = create_app(settings, transport=httpx.MockTransport(handler), state_store=store)
+    async with app_client(app) as client:
+        response = await client.get(
+            "/v1/oauth/linkedin/callback",
+            params={"state": state.value, "code": "synthetic-code"},
+        )
+
+    assert response.status_code == 200
+    assert introspection_seen
+    assert response.json()["granted_scopes"] == ["openid", "profile", "w_member_social"]
+    assert settings.stage0_token_store_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_inactive_introspected_token_is_rejected_without_persistence(
+    settings_factory: object,
+) -> None:
+    settings = settings_factory()  # type: ignore[operator]
+    store = InMemoryOAuthStateStore()
+    state = store.issue(900)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/accessToken"):
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "AQ-synthetic-secret-token-value",
+                    "expires_in": 3600,
+                },
+            )
+        if request.url.path.endswith("/introspectToken"):
+            return httpx.Response(
+                200,
+                json={
+                    "active": False,
+                    "client_id": "synthetic-client-id",
+                    "scope": "openid,profile,w_member_social",
+                },
+            )
+        pytest.fail("UserInfo must not be called for an inactive token")
+
+    app = create_app(settings, transport=httpx.MockTransport(handler), state_store=store)
+    async with app_client(app) as client:
+        response = await client.get(
+            "/v1/oauth/linkedin/callback",
+            params={"state": state.value, "code": "synthetic-code"},
+        )
+
+    assert response.status_code == 403
+    assert not settings.stage0_token_store_path.exists()
+    assert "AQ-synthetic-secret-token-value" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_introspection_client_mismatch_is_rejected(
+    settings_factory: object,
+) -> None:
+    settings = settings_factory()  # type: ignore[operator]
+    store = InMemoryOAuthStateStore()
+    state = store.issue(900)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/accessToken"):
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "AQ-synthetic-secret-token-value",
+                    "expires_in": 3600,
+                },
+            )
+        if request.url.path.endswith("/introspectToken"):
+            return httpx.Response(
+                200,
+                json={
+                    "active": True,
+                    "client_id": "different-client-id",
+                    "scope": "openid,profile,w_member_social",
+                },
+            )
+        pytest.fail("UserInfo must not be called for a token issued to another client")
+
+    app = create_app(settings, transport=httpx.MockTransport(handler), state_store=store)
+    async with app_client(app) as client:
+        response = await client.get(
+            "/v1/oauth/linkedin/callback",
+            params={"state": state.value, "code": "synthetic-code"},
+        )
+
+    assert response.status_code == 403
+    assert not settings.stage0_token_store_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_callback_rejects_missing_required_scope_without_exposing_token(
+    settings_factory: object,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings = settings_factory()  # type: ignore[operator]
+    store = InMemoryOAuthStateStore()
+    state = store.issue(900)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/accessToken"):
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "AQ-synthetic-secret-token-value",
+                    "expires_in": 3600,
+                    "scope": "openid,profile",
                 },
             )
         return httpx.Response(200, json={"sub": "member_123"})
@@ -196,3 +405,5 @@ async def test_callback_rejects_missing_required_scope(settings_factory: object)
         )
     assert response.status_code == 403
     assert not settings.stage0_token_store_path.exists()
+    assert "AQ-synthetic-secret-token-value" not in response.text
+    assert "AQ-synthetic-secret-token-value" not in caplog.text

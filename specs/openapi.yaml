@@ -51,6 +51,7 @@ paths:
           description: Completed without returning a token
           content: {application/json: {schema: {$ref: "#/components/schemas/OAuthSafeResult"}}}
         "400": {$ref: "#/components/responses/BadRequest"}
+        "403": {$ref: "#/components/responses/Forbidden"}
         "502": {$ref: "#/components/responses/UpstreamFailure"}
   /v1/integrations/linkedin/status:
     get:
@@ -163,6 +164,9 @@ components:
       content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
     Conflict:
       description: State or idempotency conflict
+      content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
+    Forbidden:
+      description: Required OAuth scopes or verified token metadata are unavailable
       content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
     UpstreamFailure:
       description: Safe upstream failure without credentials or raw body

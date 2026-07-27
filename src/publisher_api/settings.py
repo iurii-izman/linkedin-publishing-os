@@ -2,12 +2,30 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from urllib.parse import unquote_plus
 
 from cryptography.fernet import Fernet
 from pydantic import Field, HttpUrl, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _VERSION_RE = re.compile(r"^\d{6}$")
+_SCOPE_SEPARATOR_RE = re.compile(r"[\s,]+")
+STAGE0_REQUIRED_SCOPE_ORDER = ("openid", "profile", "w_member_social")
+STAGE0_REQUIRED_SCOPES = frozenset(STAGE0_REQUIRED_SCOPE_ORDER)
+
+
+def normalize_scopes(value: str | list[str] | None) -> list[str]:
+    """Return unique decoded scopes from LinkedIn string or list representations."""
+    values = [value] if isinstance(value, str) else value or []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in values:
+        decoded = unquote_plus(item)
+        for scope in _SCOPE_SEPARATOR_RE.split(decoded):
+            if scope and scope not in seen:
+                normalized.append(scope)
+                seen.add(scope)
+    return normalized
 
 
 class Settings(BaseSettings):
@@ -26,6 +44,9 @@ class Settings(BaseSettings):
     linkedin_api_base_url: HttpUrl = HttpUrl("https://api.linkedin.com")
     linkedin_authorization_url: HttpUrl = HttpUrl("https://www.linkedin.com/oauth/v2/authorization")
     linkedin_token_url: HttpUrl = HttpUrl("https://www.linkedin.com/oauth/v2/accessToken")
+    linkedin_token_introspection_url: HttpUrl = HttpUrl(
+        "https://www.linkedin.com/oauth/v2/introspectToken"
+    )
     linkedin_userinfo_url: HttpUrl = HttpUrl("https://api.linkedin.com/v2/userinfo")
     linkedin_api_version: str
     linkedin_restli_version: str = "2.0.0"
@@ -49,11 +70,10 @@ class Settings(BaseSettings):
     @field_validator("linkedin_scopes")
     @classmethod
     def validate_scopes(cls, value: str) -> str:
-        scopes = value.split()
-        required = {"openid", "profile", "w_member_social"}
-        if set(scopes) != required:
+        scopes = normalize_scopes(value)
+        if set(scopes) != STAGE0_REQUIRED_SCOPES:
             raise ValueError("Stage 0 scopes must be exactly: openid profile w_member_social")
-        return " ".join(scopes)
+        return " ".join(STAGE0_REQUIRED_SCOPE_ORDER)
 
     @model_validator(mode="after")
     def validate_urls_and_secrets(self) -> Settings:
@@ -68,6 +88,7 @@ class Settings(BaseSettings):
                 self.linkedin_api_base_url,
                 self.linkedin_authorization_url,
                 self.linkedin_token_url,
+                self.linkedin_token_introspection_url,
                 self.linkedin_userinfo_url,
             )
             if any(url.scheme != "https" for url in urls):

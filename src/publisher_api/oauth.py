@@ -11,10 +11,14 @@ from urllib.parse import urlencode
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-from publisher_api.settings import Settings
+from publisher_api.settings import Settings, normalize_scopes
 
 
 class OAuthStateError(ValueError):
+    pass
+
+
+class OAuthTokenVerificationError(ValueError):
     pass
 
 
@@ -23,11 +27,20 @@ class OAuthTokenResponse(BaseModel):
 
     access_token: SecretStr
     expires_in: int = Field(gt=0)
-    scope: str
+    scope: str | list[str] | None = None
     token_type: str | None = None
     id_token: SecretStr | None = None
     refresh_token: SecretStr | None = None
     refresh_token_expires_in: int | None = None
+
+
+class TokenIntrospectionResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    active: bool
+    client_id: str | None = None
+    scope: str | list[str] | None = None
+    expires_at: int | None = Field(default=None, gt=0)
 
 
 class UserInfo(BaseModel):
@@ -41,6 +54,12 @@ class UserInfo(BaseModel):
 class OAuthState:
     value: str
     expires_at: datetime
+
+
+@dataclass(frozen=True)
+class VerifiedTokenMetadata:
+    granted_scopes: list[str]
+    introspected_expires_at: datetime | None = None
 
 
 class InMemoryOAuthStateStore:
@@ -107,6 +126,50 @@ class OAuthClient:
         )
         response.raise_for_status()
         return OAuthTokenResponse.model_validate(response.json())
+
+    async def introspect_token(self, access_token: SecretStr) -> TokenIntrospectionResponse:
+        response = await self._client.post(
+            str(self._settings.linkedin_token_introspection_url),
+            data={
+                "client_id": self._settings.linkedin_client_id.get_secret_value(),
+                "client_secret": self._settings.linkedin_client_secret.get_secret_value(),
+                "token": access_token.get_secret_value(),
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        response.raise_for_status()
+        return TokenIntrospectionResponse.model_validate(response.json())
+
+    async def verify_token_metadata(self, token: OAuthTokenResponse) -> VerifiedTokenMetadata:
+        granted_scopes = normalize_scopes(token.scope)
+        if granted_scopes:
+            return VerifiedTokenMetadata(granted_scopes=granted_scopes)
+
+        return await self.verify_introspection(token.access_token)
+
+    async def verify_introspection(self, access_token: SecretStr) -> VerifiedTokenMetadata:
+        introspection = await self.introspect_token(access_token)
+        expected_client_id = self._settings.linkedin_client_id.get_secret_value()
+        if not introspection.active:
+            raise OAuthTokenVerificationError("LinkedIn token is inactive")
+        if introspection.client_id is None or not secrets.compare_digest(
+            introspection.client_id, expected_client_id
+        ):
+            raise OAuthTokenVerificationError("LinkedIn token client does not match")
+        granted_scopes = normalize_scopes(introspection.scope)
+        if not granted_scopes:
+            raise OAuthTokenVerificationError("LinkedIn token scopes are unavailable")
+        introspected_expires_at = (
+            datetime.fromtimestamp(introspection.expires_at, tz=UTC)
+            if introspection.expires_at is not None
+            else None
+        )
+        if introspected_expires_at is not None and introspected_expires_at <= datetime.now(UTC):
+            raise OAuthTokenVerificationError("LinkedIn token is expired")
+        return VerifiedTokenMetadata(
+            granted_scopes=granted_scopes,
+            introspected_expires_at=introspected_expires_at,
+        )
 
     async def userinfo(self, access_token: SecretStr) -> UserInfo:
         response = await self._client.get(

@@ -22,6 +22,9 @@ def settings_factory(tmp_path: Path) -> Callable[..., Settings]:
             "linkedin_api_base_url": "https://api.linkedin.test",
             "linkedin_authorization_url": "https://auth.linkedin.test/oauth/v2/authorization",
             "linkedin_token_url": "https://auth.linkedin.test/oauth/v2/accessToken",
+            "linkedin_token_introspection_url": (
+                "https://auth.linkedin.test/oauth/v2/introspectToken"
+            ),
             "linkedin_userinfo_url": "https://api.linkedin.test/v2/userinfo",
             "linkedin_api_version": "202607",
             "token_encryption_key": Fernet.generate_key().decode("ascii"),

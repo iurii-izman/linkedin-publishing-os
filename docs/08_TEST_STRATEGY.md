@@ -96,6 +96,16 @@ No live LinkedIn secret in CI.
 The isolated harness uses `httpx.MockTransport`; no test resolves or calls a real
 LinkedIn endpoint. Coverage includes settings, OAuth state entropy/expiry/replay,
 callback denial/missing code, token parsing/encrypted storage/redaction, UserInfo,
-person URN construction, text/image request contracts, upload-host validation,
+scope normalization for whitespace/comma/URL-encoded/list representations, missing
+scope introspection, inactive token and client mismatch rejection, person URN
+construction, text/image request contracts, upload-host validation,
 201/post URN, 400/401/403/409/426/429/500/503, pre-send connect timeout, ambiguous
-final timeout and mandatory live confirmation.
+final timeout and mandatory live confirmation. Local image review additionally covers
+PNG signature/MIME/dimensions/mode, corrupted files, image checksum and caption
+mutations, exact pair fingerprint binding, separation from text approvals, arbitrary
+pair rejection, encrypted-store identity reuse, no-network dry-run and the absence of
+live image approval before an explicit owner checkpoint. A safe recording transport
+also exercises the entire image flow offline, capturing only method, host, path,
+header names, JSON shape and byte count. Separate HTTP 400 fixtures assert exact
+`INITIALIZE_UPLOAD`, `BINARY_UPLOAD` and `IMAGE_STATUS` attribution, redaction,
+short-circuiting before the final post and zero automatic retry.

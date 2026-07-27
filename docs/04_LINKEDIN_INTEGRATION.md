@@ -48,6 +48,19 @@ Use returned `expires_in`. Official docs currently state 60 days, but code must 
 
 Reauthorize 14 days before expiry by default. Do not assume a refresh token. On 401, mark `AUTH_REQUIRED` and preserve jobs.
 
+The Stage 0 authorization request uses the least-privilege set `openid`, `profile`
+and `w_member_social`; it does not request or require `email`. Granted scopes are
+URL-decoded and normalized from string or list representations using both whitespace
+and comma separators.
+
+If the access-token response omits `scope`, the backend must verify the token with
+`POST https://www.linkedin.com/oauth/v2/introspectToken`. The client ID, client
+secret and token are sent only in the form-encoded POST body and are never logged.
+The callback proceeds only when introspection reports `active=true`, returns the
+configured client ID and confirms all required Stage 0 scopes. An inactive token,
+client mismatch, missing `w_member_social` or unverifiable introspection response is
+rejected before the encrypted connection store is written.
+
 ## 4. Member identity
 
 OIDC UserInfo returns a pairwise `sub`. Stage 0 must verify the identifier accepted by:
@@ -142,6 +155,20 @@ Only accept the documented HTTPS LinkedIn upload host/path. Stage 0 holds the UR
 memory only. Production encrypts it temporarily and deletes it after use or expiry.
 
 Alt text is generated and reviewable.
+
+Stage 0 diagnostic note, verified against the official Images API documentation on
+27 July 2026: `w_member_social` is sufficient for image write operations but is
+write-only for the versioned `GET /rest/images/{imageUrn}` gateway. The current
+owner token therefore cannot use versioned image-status polling as proof of
+readiness. A full live retry remains blocked until a separately approved targeted
+probe identifies the original failing media stage and the readiness strategy is
+resolved without assuming additional read permission.
+
+The adapter URL-encodes a single image URN resource key under Rest.li 2.0 and emits
+only a typed safe error record containing the stage, HTTP status, safe error codes,
+redacted message and request/response booleans. Stages are `INITIALIZE_UPLOAD`,
+`BINARY_UPLOAD`, `IMAGE_STATUS` and `FINAL_POST`; tokens, authorization headers and
+signed upload URLs are never included.
 
 ## 9. Document flow
 

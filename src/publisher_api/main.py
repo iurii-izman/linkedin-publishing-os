@@ -12,9 +12,14 @@ from fastapi.responses import JSONResponse
 
 from publisher_api import __version__
 from publisher_api.linkedin import author_urn_from_subject
-from publisher_api.oauth import InMemoryOAuthStateStore, OAuthClient, OAuthStateError
+from publisher_api.oauth import (
+    InMemoryOAuthStateStore,
+    OAuthClient,
+    OAuthStateError,
+    OAuthTokenVerificationError,
+)
 from publisher_api.redaction import redact_text
-from publisher_api.settings import Settings
+from publisher_api.settings import STAGE0_REQUIRED_SCOPES, Settings
 from publisher_api.token_store import EncryptedConnectionStore, StoredConnection
 
 
@@ -90,6 +95,23 @@ def create_app(
             raise HTTPException(status_code=400, detail="OAuth callback code is missing")
         try:
             token = await oauth.exchange_code(code)
+            verified_token = await oauth.verify_token_metadata(token)
+        except OAuthTokenVerificationError:
+            raise HTTPException(
+                status_code=403,
+                detail="LinkedIn token verification failed for Stage 0",
+            ) from None
+        except (httpx.HTTPError, ValueError):
+            raise HTTPException(
+                status_code=502, detail="LinkedIn OAuth completion failed; inspect safe logs"
+            ) from None
+        granted_scopes = verified_token.granted_scopes
+        if not STAGE0_REQUIRED_SCOPES.issubset(granted_scopes):
+            raise HTTPException(
+                status_code=403,
+                detail="LinkedIn did not grant every required Stage 0 scope",
+            )
+        try:
             userinfo = await oauth.userinfo(token.access_token)
             author_urn = author_urn_from_subject(userinfo.sub)
         except (httpx.HTTPError, ValueError):
@@ -97,13 +119,8 @@ def create_app(
                 status_code=502, detail="LinkedIn OAuth completion failed; inspect safe logs"
             ) from None
         expires_at = datetime.now(UTC) + timedelta(seconds=token.expires_in)
-        granted_scopes = token.scope.split()
-        required_scopes = set(active_settings.linkedin_scopes.split())
-        if not required_scopes.issubset(granted_scopes):
-            raise HTTPException(
-                status_code=403,
-                detail="LinkedIn did not grant every required Stage 0 scope",
-            )
+        if verified_token.introspected_expires_at is not None:
+            expires_at = min(expires_at, verified_token.introspected_expires_at)
         connection_store.save(
             StoredConnection(
                 access_token=token.access_token,

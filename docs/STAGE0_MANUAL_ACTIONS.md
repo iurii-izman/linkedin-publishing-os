@@ -79,35 +79,57 @@ It must not contain any token. The encrypted local record is
 
 ## 4. Dry preparation
 
-Use the callback's safe person URN:
+The text planning helper accepts a safe person URN. The image helper obtains the
+author URN from the encrypted Stage 0 connection store:
 
 ```powershell
 uv run lpos-stage0 prepare-text --author-urn "urn:li:person:<observed-id>"
-uv run lpos-stage0 prepare-image --author-urn "urn:li:person:<observed-id>" --image .\synthetic-stage0.png
+uv run lpos-stage0 prepare-image `
+  --image .\assets\stage0\linkedin-publishing-workflow.png `
+  --text "<exact owner-reviewed caption>" `
+  --alt-text "Architecture diagram of a human-approved LinkedIn publishing workflow with an explicit Publish Uncertain state."
 ```
 
-These commands print redacted request plans and make no LinkedIn call.
+These commands print redacted request plans and make no LinkedIn call. The image
+dry-run validates the fixed 1200 x 1200 RGB PNG, caption hash and alt text, then
+stores only a safe review record under the ignored `.stage0` directory.
+
+The Stage 0 text guard accepts the synthetic fixture prefix and one owner-approved
+exact SHA-256 content hash. The approved hash is calculated from the exact UTF-8
+text bytes; any character, whitespace or line-break change is rejected. This narrow
+feasibility exception is not a production content or approval workflow, and the
+synthetic fixture is never selected automatically for publication.
 
 ## 5. Controlled text publication
 
 Review the fixed synthetic text, then run exactly once:
 
 ```powershell
-uv run lpos-stage0 publish-text --confirm-live-publish
+uv run lpos-stage0 publish-text --text "<exact reviewed text>" --confirm-live-publish
 ```
 
 Expected output is HTTP 201 and a `urn:li:share:*` or `urn:li:ugcPost:*` value. If the
 command reports `UNCERTAIN`, do not rerun it. Inspect the LinkedIn profile manually.
+`publish-text` has no implicit text default; the reviewed text must always be supplied.
 
 ## 6. Controlled image publication
 
-Create a public-safe JPEG or PNG containing only synthetic test graphics. Then:
+Image live publication is a separate owner-controlled checkpoint. The repository
+contains one reviewed PNG and caption pair, but its live-approval fingerprint is
+empty until the owner explicitly approves that exact pair. A changed byte, caption
+character, space, line break or alt-text character invalidates the review.
 
 ```powershell
-uv run lpos-stage0 publish-image --image .\synthetic-stage0.png --alt-text "Synthetic Stage 0 API test image" --confirm-live-publish
+uv run lpos-stage0 publish-image `
+  --image .\assets\stage0\linkedin-publishing-workflow.png `
+  --text "<exact separately approved caption>" `
+  --alt-text "Architecture diagram of a human-approved LinkedIn publishing workflow with an explicit Publish Uncertain state." `
+  --confirm-live-publish
 ```
 
-The harness initializes the image, uploads only to the validated
+Do not run this command from the dry-run checkpoint. After the exact review
+fingerprint receives a separate owner approval, the harness initializes the image,
+uploads only to the validated
 `https://www.linkedin.com/dms-uploads/` host, waits a bounded time for `AVAILABLE`,
 and performs one final post request. It never retries the final request.
 
@@ -133,10 +155,13 @@ LinkedIn's native UI after recording the URNs and outcome.
 |---|---|
 | OAuth 400/401 | Recheck exact redirect URI, code freshness, client ID and state; start a new flow. |
 | 401 from API | Reauthorize; do not recreate scheduled work. |
-| 403 | Confirm product, `w_member_social`, author URN and app ownership; stop for a decision. |
+| 403 during OAuth callback | Confirm products and `w_member_social`; do not reuse the consumed code/state. The harness normalizes returned scopes and introspects only when the token response omits them. |
+| 403 from publishing API | Confirm product, `w_member_social`, author URN and app ownership; stop for a decision. |
 | 409 | Record the response status; do not switch endpoints or retry blindly. |
 | 426 | Stop, verify a supported version in official docs, update config and rerun mock checks first. |
 | 429 | Record `Retry-After` if present and stop the smoke; do not loop. |
 | 500/503 | Do not retry a final post automatically; manually inspect the profile. |
 | timeout/connection loss after final request | Treat as `PUBLISH_UNCERTAIN`; reconcile manually. |
 | 201 without `x-restli-id` | Treat as uncertain and inspect the profile manually. |
+| Image media HTTP 400 | Record the typed safe stage. Do not repeat the full flow. If the stage is still unknown, request separate owner approval for one initialize-only probe. |
+| Image status with only `w_member_social` | Do not assume versioned `GET /rest/images/{imageUrn}` is available; the official Images API documents this scope as write-only for versioned GET. |

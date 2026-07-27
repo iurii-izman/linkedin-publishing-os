@@ -75,8 +75,6 @@ async def test_missing_x_restli_id_is_uncertain(settings_factory: object) -> Non
         (409, "FINAL_LINKEDIN_CONFLICT"),
         (426, "FINAL_LINKEDIN_VERSION_UNSUPPORTED"),
         (429, "FINAL_LINKEDIN_RATE_LIMITED"),
-        (500, "FINAL_LINKEDIN_SERVER_ERROR"),
-        (503, "FINAL_LINKEDIN_UNAVAILABLE"),
     ],
 )
 @pytest.mark.asyncio
@@ -94,6 +92,31 @@ async def test_final_post_error_mapping(
             )
     assert exc_info.value.safe_code == safe_code
     assert TOKEN not in repr(exc_info.value)
+
+
+@pytest.mark.parametrize("status", [500, 503])
+@pytest.mark.asyncio
+async def test_final_post_server_error_is_uncertain(settings_factory: object, status: int) -> None:
+    request_count = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal request_count
+        request_count += 1
+        return httpx.Response(status)
+
+    settings = settings_factory()  # type: ignore[operator]
+    async with httpx.AsyncClient(
+        base_url=str(settings.linkedin_api_base_url),
+        transport=httpx.MockTransport(handler),
+    ) as http_client:
+        with pytest.raises(PublishUncertainError) as exc_info:
+            await LinkedInClient(settings, http_client).create_text_post(
+                TOKEN, AUTHOR, "[SYNTHETIC STAGE 0] Test"
+            )
+    assert exc_info.value.safe_code == "FINAL_REQUEST_OUTCOME_UNCERTAIN"
+    assert exc_info.value.status_code == status
+    assert exc_info.value.record.stage == "FINAL_POST"
+    assert request_count == 1
 
 
 @pytest.mark.asyncio
@@ -114,7 +137,11 @@ async def test_timeout_before_send_is_safe(settings_factory: object) -> None:
 
 @pytest.mark.asyncio
 async def test_timeout_after_final_request_begins_is_uncertain(settings_factory: object) -> None:
+    request_count = 0
+
     def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal request_count
+        request_count += 1
         raise httpx.ReadTimeout("synthetic", request=request)
 
     settings = settings_factory()  # type: ignore[operator]
@@ -122,10 +149,14 @@ async def test_timeout_after_final_request_begins_is_uncertain(settings_factory:
         base_url=str(settings.linkedin_api_base_url),
         transport=httpx.MockTransport(handler),
     ) as http_client:
-        with pytest.raises(PublishUncertainError):
+        with pytest.raises(PublishUncertainError) as exc_info:
             await LinkedInClient(settings, http_client).create_text_post(
                 TOKEN, AUTHOR, "[SYNTHETIC STAGE 0] Test"
             )
+    assert exc_info.value.record.stage == "FINAL_POST"
+    assert exc_info.value.record.request_attempted is True
+    assert exc_info.value.record.response_received is False
+    assert request_count == 1
 
 
 @pytest.mark.asyncio
@@ -162,7 +193,11 @@ async def test_image_initialize_upload_status_and_post(settings_factory: object)
     ) as http_client:
         client = LinkedInClient(settings, http_client)
         reservation = await client.initialize_image(TOKEN, AUTHOR)
-        await client.upload_image(TOKEN, reservation, b"synthetic-image", "image/png")
+        assert reservation.http_status == 200
+        upload_status = await client.upload_image(
+            TOKEN, reservation, b"synthetic-image", "image/png"
+        )
+        assert upload_status == 201
         await client.wait_for_image(TOKEN, reservation.image_urn)
         receipt = await client.create_image_post(
             TOKEN,
@@ -195,3 +230,35 @@ async def test_untrusted_upload_url_is_rejected(settings_factory: object) -> Non
             await LinkedInClient(settings, http_client).upload_image(
                 TOKEN, reservation, b"data", "image/png"
             )
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_upload_reconciles_existing_image_without_retry(
+    settings_factory: object,
+) -> None:
+    upload_attempts = 0
+    status_attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal upload_attempts, status_attempts
+        if request.method == "PUT":
+            upload_attempts += 1
+            raise httpx.ReadTimeout("synthetic", request=request)
+        status_attempts += 1
+        return httpx.Response(200, json={"id": IMAGE_URN, "status": "AVAILABLE"})
+
+    settings = settings_factory()  # type: ignore[operator]
+    reservation = ImageReservation(
+        image_urn=IMAGE_URN,
+        upload_url="https://www.linkedin.com/dms-uploads/synthetic?signature=fixture",
+        upload_url_expires_at=1_800_000_000_000,
+    )
+    async with httpx.AsyncClient(
+        base_url=str(settings.linkedin_api_base_url),
+        transport=httpx.MockTransport(handler),
+    ) as http_client:
+        await LinkedInClient(settings, http_client).upload_image_once_and_wait(
+            TOKEN, reservation, b"data", "image/png"
+        )
+    assert upload_attempts == 1
+    assert status_attempts == 1
