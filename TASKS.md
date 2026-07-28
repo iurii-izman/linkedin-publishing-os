@@ -2,6 +2,17 @@
 
 Status: `[ ]` not started · `[-]` in progress · `[x]` complete · `[!]` blocked · `[~]` deferred
 
+## Stage 1 Vertical MVP checkpoint
+
+- [x] PostgreSQL/Alembic foundation with upgrade, downgrade and repeat upgrade.
+- [x] Draft plus immutable exact-UTF-8 revisions and server-side SHA-256.
+- [x] Exact current-revision approval, revocation and DB-backed idempotency.
+- [x] Immediate text prepare/execute with one-attempt constraint and row locks.
+- [x] Ambiguous final outcomes and stale `PUBLISHING` reconcile to `PUBLISH_UNCERTAIN`.
+- [x] Versioned AEAD connection import retaining the Stage 0 store.
+- [x] Owner-authenticated API, append-only audit, offline fake-adapter E2E.
+- [x] Live LinkedIn publication disabled pending controlled owner validation.
+
 ## EPIC 0 — LinkedIn API feasibility gate
 
 ### Stage 0 preparation (repository work)

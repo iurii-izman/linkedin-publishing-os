@@ -117,3 +117,19 @@ The reference schema enforces that `PUBLISHED` has both post URN and timestamp a
 that a job has at most one incomplete attempt. Application commands must additionally
 enforce approved-draft scheduling and transition legality transactionally; reference
 DDL is not a substitute for Stage 1 migration and repository tests.
+
+## 9. Implemented Stage 1 vertical profile
+
+The immediate-text vertical uses the deliberately smaller publication states
+`PREPARED`, `PUBLISHING`, `PUBLISHED`, `FAILED` and `PUBLISH_UNCERTAIN`. Its only
+legal transitions are:
+
+```text
+PREPARED → PUBLISHING
+PUBLISHING → PUBLISHED | FAILED | PUBLISH_UNCERTAIN
+```
+
+The broader scheduled-job states above remain the target for later scheduling work.
+Stage 1 revision canonicalization is `utf8-exact-v1`: SHA-256 is calculated over
+the exact UTF-8 bytes, without whitespace, newline or Unicode normalization.
+See [`STAGE1_VERTICAL_MVP.md`](STAGE1_VERTICAL_MVP.md).

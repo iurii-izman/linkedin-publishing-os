@@ -89,3 +89,11 @@ Stop automation for the job, check LinkedIn manually, resolve as published with 
 ## 11. Runbook — rollback
 
 Pause scheduler, back up DB, record current images and migration revision, validate downgrade support and preserve queued jobs.
+
+## 12. Stage 1 immediate-text operations
+
+The implemented migration, readiness behavior, safe connection import, stale
+`PUBLISHING` reconciliation, backup/restore procedure and controlled live checkpoint
+are documented in [`STAGE1_VERTICAL_MVP.md`](STAGE1_VERTICAL_MVP.md). Stage 1 does
+not start migrations automatically and has no retry command for terminal
+publications.

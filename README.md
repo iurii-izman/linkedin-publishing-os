@@ -43,6 +43,7 @@
 | [`docs/13_ACCEPTANCE_CHECKLISTS.md`](docs/13_ACCEPTANCE_CHECKLISTS.md) | Приёмочные чек-листы |
 | [`docs/00_SPEC_AUDIT_REPORT.md`](docs/00_SPEC_AUDIT_REPORT.md) | Фактический аудит пакета и исправления |
 | [`docs/STAGE0_MANUAL_ACTIONS.md`](docs/STAGE0_MANUAL_ACTIONS.md) | Ручные действия владельца для безопасного spike |
+| [`docs/STAGE1_VERTICAL_MVP.md`](docs/STAGE1_VERTICAL_MVP.md) | Локальный запуск, exact approval, idempotency, recovery и controlled live checkpoint |
 | [`docs/feasibility_report.md`](docs/feasibility_report.md) | Шаблон фактических результатов Stage 0 |
 | [`specs/openapi.yaml`](specs/openapi.yaml) | Целевой внутренний HTTP API |
 | [`specs/schema.sql`](specs/schema.sql) | Референсная PostgreSQL-схема |
@@ -83,6 +84,11 @@ uv run mypy .
 uv run pytest -q
 uv run python scripts/validate_repository.py
 ```
+
+Stage 1 запускается только после явной миграции PostgreSQL. Полная инструкция,
+безопасные CLI-команды и offline E2E описаны в
+[`docs/STAGE1_VERTICAL_MVP.md`](docs/STAGE1_VERTICAL_MVP.md). Реальная публикация
+по умолчанию заблокирована.
 
 ## Жёсткие ограничения
 

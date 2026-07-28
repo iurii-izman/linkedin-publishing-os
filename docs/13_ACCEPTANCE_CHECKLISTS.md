@@ -16,19 +16,19 @@
 
 ## Text MVP
 
-- [ ] immutable draft;
-- [ ] approval binds exact hash;
-- [ ] edit invalidates approval;
+- [x] immutable draft revision;
+- [x] approval binds exact hash;
+- [x] new revision invalidates old approval for active use;
 - [ ] UTC schedule;
-- [ ] concurrent execution publishes once;
-- [ ] 201 stores URN;
-- [ ] 400 no retry;
+- [x] concurrent immediate execution publishes once;
+- [x] 201 stores URN;
+- [x] unambiguous 400 no retry;
 - [ ] 401 preserves job;
 - [ ] 429 backoff;
-- [ ] final timeout uncertain;
-- [ ] uncertain never auto-executes;
+- [x] final timeout uncertain;
+- [x] uncertain never auto-executes;
 - [ ] reliable outbox;
-- [ ] no token in logs.
+- [x] no token in logs.
 
 ## Content engine
 
@@ -55,15 +55,15 @@
 
 ## Security
 
-- [ ] token encrypted;
-- [ ] DB dump has no plaintext token;
-- [ ] internal API auth;
+- [x] Stage 1 token encrypted;
+- [x] PostgreSQL stores no plaintext token;
+- [x] owner API auth;
 - [ ] Telegram allowlist;
 - [ ] state replay rejected;
-- [ ] secret scan clean;
+- [x] tracked and candidate secret scans clean;
 - [ ] n8n audit reviewed;
 - [ ] backup restore tested;
-- [ ] no browser automation dependencies.
+- [x] no browser automation dependencies.
 
 ## Production readiness
 

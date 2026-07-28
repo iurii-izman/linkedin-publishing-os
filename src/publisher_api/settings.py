@@ -29,7 +29,7 @@ def normalize_scopes(value: str | list[str] | None) -> list[str]:
 
 
 class Settings(BaseSettings):
-    """Configuration for the isolated Stage 0 harness."""
+    """Configuration shared by the isolated Stage 0 harness and Stage 1 API."""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
@@ -59,6 +59,18 @@ class Settings(BaseSettings):
     token_encryption_key: SecretStr
     stage0_owner_key: SecretStr
     stage0_token_store_path: Path = Path(".stage0/linkedin-connection.enc")
+
+    database_url: SecretStr = SecretStr(
+        "postgresql+psycopg://publisher:publisher@127.0.0.1:5432/publisher"
+    )
+    database_pool_size: int = Field(default=5, ge=1, le=50)
+    database_max_overflow: int = Field(default=5, ge=0, le=50)
+    database_connect_timeout: int = Field(default=5, ge=1, le=30)
+    app_owner_key: SecretStr | None = None
+    stage1_token_key_id: str = Field(default="primary", pattern=r"^[A-Za-z0-9_-]{1,32}$")
+    live_linkedin_publishing_enabled: bool = False
+    linkedin_publisher_mode: str = "disabled"
+    stale_publication_seconds: int = Field(default=300, ge=30, le=86400)
 
     @field_validator("linkedin_api_version")
     @classmethod
@@ -108,8 +120,31 @@ class Settings(BaseSettings):
             raise ValueError("TOKEN_ENCRYPTION_KEY must be a valid Fernet key") from exc
         if len(self.stage0_owner_key.get_secret_value()) < 32:
             raise ValueError("STAGE0_OWNER_KEY must contain at least 32 characters")
+        if self.app_owner_key is not None:
+            owner_key = self.app_owner_key.get_secret_value()
+            if not owner_key or owner_key.startswith("change-me") or len(owner_key) < 32:
+                raise ValueError("APP_OWNER_KEY must contain at least 32 configured characters")
+        allowed_modes = {
+            "disabled",
+            "live",
+            "fake-success",
+            "fake-4xx",
+            "fake-timeout",
+            "fake-connection-reset",
+            "fake-5xx",
+            "fake-response-lost",
+        }
+        if self.linkedin_publisher_mode not in allowed_modes:
+            raise ValueError("LINKEDIN_PUBLISHER_MODE is unsupported")
+        if self.app_env == "production" and self.linkedin_publisher_mode.startswith("fake-"):
+            raise ValueError("fake LinkedIn publishers are forbidden in production")
         return self
 
     @property
     def timeout(self) -> tuple[float, float]:
         return (self.linkedin_timeout_connect_seconds, self.linkedin_timeout_read_seconds)
+
+    @property
+    def owner_key(self) -> SecretStr:
+        """Use the dedicated Stage 1 key, with Stage 0 compatibility for old local env files."""
+        return self.app_owner_key or self.stage0_owner_key

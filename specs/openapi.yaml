@@ -1,275 +1,471 @@
 openapi: 3.1.0
 info:
-  title: LinkedIn Publishing OS Internal API
-  version: 1.0.0
-  description: Internal API used by n8n. Access tokens are never returned.
+  title: LinkedIn Publishing OS
+  version: 0.2.0
+  description: >
+    Owner-only Stage 1 vertical API. All publication execution is disabled unless
+    an explicit non-production fake adapter or separately approved live capability
+    is configured. Tokens are never returned.
 servers:
   - url: https://publisher.example.com
 security:
-  - ServiceToken: []
+  - OwnerKey: []
 paths:
   /health:
     get:
       security: []
+      operationId: health
       responses:
         "200":
-          description: Process alive
-          content: {application/json: {schema: {$ref: "#/components/schemas/Health"}}}
+          description: Process is running
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Health"}
   /ready:
     get:
       security: []
-      responses: {"200": {description: Ready}, "503": {description: Not ready}}
-  /v1/oauth/linkedin/start:
-    post:
-      summary: Create one-time OAuth URL
-      security:
-        - Stage0OwnerKey: []
+      operationId: ready
       responses:
-        "200":
-          description: URL
+        "200": {description: Database and migration are ready}
+        "503":
+          description: Database unavailable or migration is not current
           content:
             application/json:
-              schema:
-                type: object
-                required: [authorization_url, expires_at]
-                properties:
-                  authorization_url: {type: string, format: uri}
-                  expires_at: {type: string, format: date-time}
-        "401":
-          description: Invalid Stage 0 owner key
+              schema: {$ref: "#/components/schemas/Readiness"}
+  /v1/oauth/linkedin/start:
+    post:
+      security:
+        - Stage0OwnerKey: []
+      operationId: stage0OAuthStart
+      responses:
+        "200": {description: Stage 0 authorization URL created}
+        "401": {$ref: "#/components/responses/Unauthorized"}
   /v1/oauth/linkedin/callback:
     get:
       security: []
+      operationId: stage0OAuthCallback
       parameters:
-        - {in: query, name: code, schema: {type: string}}
-        - {in: query, name: state, required: true, schema: {type: string}}
-        - {in: query, name: error, schema: {type: string}}
-        - {in: query, name: error_description, schema: {type: string}}
-      description: Exactly one of code or error is expected. State is always consumed once.
+        - {in: query, name: state, required: true, schema: {type: string, minLength: 20}}
+        - {in: query, name: code, schema: {type: [string, "null"]}}
+        - {in: query, name: error, schema: {type: [string, "null"]}}
+        - {in: query, name: error_description, schema: {type: [string, "null"]}}
       responses:
-        "200":
-          description: Completed without returning a token
-          content: {application/json: {schema: {$ref: "#/components/schemas/OAuthSafeResult"}}}
+        "200": {description: Stage 0 connection encrypted locally}
         "400": {$ref: "#/components/responses/BadRequest"}
         "403": {$ref: "#/components/responses/Forbidden"}
-        "502": {$ref: "#/components/responses/UpstreamFailure"}
-  /v1/integrations/linkedin/status:
-    get:
-      responses:
-        "200":
-          description: Safe status
-          content: {application/json: {schema: {$ref: "#/components/schemas/IntegrationStatus"}}}
-  /v1/sources:
-    post:
-      requestBody:
-        required: true
-        content: {application/json: {schema: {$ref: "#/components/schemas/SourceCreate"}}}
-      responses: {"201": {description: Created}, "200": {description: Duplicate returned}}
-  /v1/content-items:
-    post:
-      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
-      requestBody:
-        required: true
-        content: {application/json: {schema: {$ref: "#/components/schemas/ContentItemCreate"}}}
-      responses:
-        "201": {description: Created}
-        "200": {description: Existing item returned for the same idempotency key}
-        "409": {$ref: "#/components/responses/Conflict"}
-  /v1/evidence-packs:
-    post:
-      requestBody:
-        required: true
-        content: {application/json: {schema: {$ref: "#/components/schemas/EvidencePackCreate"}}}
-      responses: {"201": {description: Created}}
+        "502": {description: Safe upstream OAuth failure}
   /v1/drafts:
     post:
+      operationId: createDraft
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
       requestBody:
         required: true
-        content: {application/json: {schema: {$ref: "#/components/schemas/DraftCreate"}}}
-      responses: {"201": {description: Created}}
-  /v1/drafts/{draft_id}/qa:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/DraftCreate"}
+      responses:
+        "201":
+          description: Draft created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Draft"}
+        "200":
+          description: Idempotent replay
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Draft"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /v1/drafts/{draft_id}:
+    get:
+      operationId: getDraft
+      parameters:
+        - {$ref: "#/components/parameters/DraftId"}
+      responses:
+        "200":
+          description: Draft
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Draft"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /v1/drafts/{draft_id}/revisions:
     post:
-      parameters: [{$ref: "#/components/parameters/DraftId"}]
-      requestBody:
-        required: true
-        content: {application/json: {schema: {$ref: "#/components/schemas/QaSubmission"}}}
-      responses: {"200": {description: QA finalized}, "409": {description: Invalid state}}
-  /v1/drafts/{draft_id}/approve:
-    post:
+      operationId: createRevision
       parameters:
         - {$ref: "#/components/parameters/DraftId"}
         - {$ref: "#/components/parameters/IdempotencyKey"}
       requestBody:
         required: true
-        content: {application/json: {schema: {$ref: "#/components/schemas/ApprovalRequest"}}}
-      responses: {"201": {description: Approved}, "409": {description: Not approvable}}
-  /v1/drafts/{draft_id}/reject:
-    post:
-      parameters: [{$ref: "#/components/parameters/DraftId"}]
-      responses: {"200": {description: Rejected}, "409": {description: Invalid state}}
-  /v1/publication-jobs:
-    post:
-      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
-      requestBody:
-        required: true
-        content: {application/json: {schema: {$ref: "#/components/schemas/PublicationJobCreate"}}}
-      responses: {"201": {description: Scheduled}, "409": {description: Duplicate or invalid}}
-  /v1/publication-jobs/execute-due:
-    post:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RevisionCreate"}
+      responses:
+        "201":
+          description: Immutable revision created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Revision"}
+        "200":
+          description: Idempotent replay
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Revision"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/ValidationError"}
+    get:
+      operationId: listRevisions
       parameters:
-        - in: query
-          name: limit
-          schema: {type: integer, minimum: 1, maximum: 20, default: 5}
-      responses: {"200": {description: Execution summaries}}
-  /v1/publication-jobs/{job_id}/resolve-uncertain:
+        - {$ref: "#/components/parameters/DraftId"}
+      responses:
+        "200":
+          description: Revisions in ascending revision order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Revision"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /v1/revisions/{revision_id}:
+    get:
+      operationId: getRevision
+      parameters:
+        - {$ref: "#/components/parameters/RevisionId"}
+      responses:
+        "200":
+          description: Immutable revision and exact SHA-256 preview fingerprint
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Revision"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /v1/revisions/{revision_id}/approve:
     post:
-      parameters: [{$ref: "#/components/parameters/JobId"}]
+      operationId: approveRevision
+      parameters:
+        - {$ref: "#/components/parameters/RevisionId"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [resolution]
-              properties:
-                resolution: {type: string, enum: [PUBLISHED, NOT_PUBLISHED]}
-                linkedin_post_urn: {type: [string, "null"]}
-      responses: {"200": {description: Resolved}, "409": {description: Not uncertain}}
-  /v1/metrics/manual:
+            schema: {$ref: "#/components/schemas/ApprovalCreate"}
+      responses:
+        "201":
+          description: Exact revision approved
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Approval"}
+        "200":
+          description: Idempotent replay
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Approval"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/approvals/{approval_id}/revoke:
     post:
-      responses: {"201": {description: Stored}}
-  /v1/outbox:
-    get:
-      responses: {"200": {description: Pending events}}
-  /v1/outbox/{event_id}/ack:
-    post:
+      operationId: revokeApproval
       parameters:
-        - {in: path, name: event_id, required: true, schema: {type: string, format: uuid}}
-      responses: {"200": {description: Acknowledged}}
+        - {$ref: "#/components/parameters/ApprovalId"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApprovalRevoke"}
+      responses:
+        "200":
+          description: Approval revoked or existing revocation returned
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Approval"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /v1/publications/prepare:
+    post:
+      operationId: preparePublication
+      description: Validates current exact approval and creates PREPARED without networking.
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PublicationPrepare"}
+      responses:
+        "201":
+          description: Publication prepared
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Publication"}
+        "200":
+          description: Idempotent replay
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Publication"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/publications/{publication_id}/execute:
+    post:
+      operationId: executePublication
+      description: >
+        Executes at most one final post attempt. A timeout, connection reset,
+        response loss, or 5xx becomes terminal PUBLISH_UNCERTAIN and is never
+        automatically retried.
+      parameters:
+        - {$ref: "#/components/parameters/PublicationId"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PublicationExecute"}
+      responses:
+        "200":
+          description: Current terminal or in-progress publication state
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Publication"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/publications/{publication_id}:
+    get:
+      operationId: getPublication
+      parameters:
+        - {$ref: "#/components/parameters/PublicationId"}
+      responses:
+        "200":
+          description: Safe publication state
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Publication"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /v1/drafts/{draft_id}/audit:
+    get:
+      operationId: getDraftAudit
+      parameters:
+        - {$ref: "#/components/parameters/DraftId"}
+      responses:
+        "200":
+          description: Append-only safe audit history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/AuditEvent"}
+        "404": {$ref: "#/components/responses/NotFound"}
 components:
   securitySchemes:
-    ServiceToken: {type: http, scheme: bearer}
-    Stage0OwnerKey: {type: apiKey, in: header, name: X-Stage0-Owner-Key}
+    OwnerKey:
+      type: apiKey
+      in: header
+      name: X-Owner-Key
+      description: Secret owner credential; the real value is never in OpenAPI.
+    Stage0OwnerKey:
+      type: apiKey
+      in: header
+      name: X-Stage0-Owner-Key
   parameters:
-    DraftId: {in: path, name: draft_id, required: true, schema: {type: string, format: uuid}}
-    JobId: {in: path, name: job_id, required: true, schema: {type: string, format: uuid}}
     IdempotencyKey:
       in: header
       name: Idempotency-Key
       required: true
       schema: {type: string, minLength: 16, maxLength: 128}
+    DraftId:
+      in: path
+      name: draft_id
+      required: true
+      schema: {type: string, format: uuid}
+    RevisionId:
+      in: path
+      name: revision_id
+      required: true
+      schema: {type: string, format: uuid}
+    ApprovalId:
+      in: path
+      name: approval_id
+      required: true
+      schema: {type: string, format: uuid}
+    PublicationId:
+      in: path
+      name: publication_id
+      required: true
+      schema: {type: string, format: uuid}
   responses:
     BadRequest:
-      description: Invalid request
-      content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
-    Conflict:
-      description: State or idempotency conflict
-      content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
+      description: Invalid request or missing explicit confirmation
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    Unauthorized:
+      description: Owner credential missing
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
     Forbidden:
-      description: Required OAuth scopes or verified token metadata are unavailable
-      content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
-    UpstreamFailure:
-      description: Safe upstream failure without credentials or raw body
-      content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}
+      description: Owner credential invalid or external capability rejected
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    NotFound:
+      description: Aggregate not found
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    Conflict:
+      description: State, approval, capability, or idempotency conflict
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
   schemas:
     Health:
       type: object
-      required: [status]
+      required: [status, stage, version]
       properties:
         status: {type: string, const: ok}
+        stage: {type: string, const: "1"}
+        version: {type: string}
+    Readiness:
+      type: object
+      required: [status, database, migrations, mutations, message]
+      properties:
+        status: {type: string, enum: [ready, not_ready]}
+        database: {type: boolean}
+        migrations: {type: boolean}
+        mutations: {type: boolean}
+        message: {type: string}
+    DraftCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        title: {type: [string, "null"], maxLength: 300}
+    Draft:
+      type: object
+      required: [id, current_revision_id, created_at, updated_at, archived_at]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: [string, "null"]}
+        current_revision_id: {type: [string, "null"], format: uuid}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        archived_at: {type: [string, "null"], format: date-time}
+    RevisionCreate:
+      type: object
+      additionalProperties: false
+      required: [text, created_by]
+      properties:
+        text: {type: string, minLength: 1, maxLength: 3000}
+        created_by: {type: string, minLength: 1, maxLength: 200}
+    Revision:
+      type: object
+      required:
+        [id, draft_id, revision_number, text, text_sha256,
+         canonicalization_version, created_by, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        draft_id: {type: string, format: uuid}
+        revision_number: {type: integer, minimum: 1}
+        text: {type: string}
+        text_sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+        canonicalization_version: {type: string, const: utf8-exact-v1}
+        supersedes_revision_id: {type: [string, "null"], format: uuid}
+        created_by: {type: string}
+        created_at: {type: string, format: date-time}
+    ApprovalCreate:
+      type: object
+      additionalProperties: false
+      required: [approved_by]
+      properties:
+        approved_by: {type: string, minLength: 1, maxLength: 200}
+    ApprovalRevoke:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 1, maxLength: 500}
+    Approval:
+      type: object
+      required:
+        [id, revision_id, revision_sha256, approval_fingerprint, approved_by,
+         approved_at, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        revision_id: {type: string, format: uuid}
+        revision_sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+        approval_fingerprint: {type: string, pattern: "^[0-9a-f]{64}$"}
+        approved_by: {type: string}
+        approved_at: {type: string, format: date-time}
+        revoked_at: {type: [string, "null"], format: date-time}
+        revocation_reason: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+    PublicationPrepare:
+      type: object
+      additionalProperties: false
+      required: [revision_id, approval_id, connection_id]
+      properties:
+        revision_id: {type: string, format: uuid}
+        approval_id: {type: string, format: uuid}
+        connection_id: {type: string, format: uuid}
+    PublicationExecute:
+      type: object
+      additionalProperties: false
+      required: [confirm_execute]
+      properties:
+        confirm_execute: {type: boolean, const: true}
+    Publication:
+      type: object
+      required:
+        [id, draft_id, revision_id, approval_id, connection_id, status,
+         request_fingerprint, linkedin_post_identifier_present, prepared_at,
+         request_attempted, response_received, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        draft_id: {type: string, format: uuid}
+        revision_id: {type: string, format: uuid}
+        approval_id: {type: string, format: uuid}
+        connection_id: {type: string, format: uuid}
+        status:
+          type: string
+          enum: [PREPARED, PUBLISHING, PUBLISHED, FAILED, PUBLISH_UNCERTAIN]
+        request_fingerprint: {type: string, pattern: "^[0-9a-f]{64}$"}
+        linkedin_post_identifier_present: {type: boolean}
+        prepared_at: {type: string, format: date-time}
+        started_at: {type: [string, "null"], format: date-time}
+        completed_at: {type: [string, "null"], format: date-time}
+        failure_category: {type: [string, "null"]}
+        safe_error_code: {type: [string, "null"]}
+        safe_error_message: {type: [string, "null"]}
+        request_attempted: {type: boolean}
+        response_received: {type: boolean}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    AuditEvent:
+      type: object
+      required:
+        [id, aggregate_type, aggregate_id, event_type, actor_type, actor_id,
+         request_id, occurred_at, safe_metadata]
+      properties:
+        id: {type: string, format: uuid}
+        aggregate_type: {type: string}
+        aggregate_id: {type: string, format: uuid}
+        event_type: {type: string}
+        actor_type: {type: string}
+        actor_id: {type: string}
+        request_id: {type: string}
+        occurred_at: {type: string, format: date-time}
+        safe_metadata: {type: object}
     Error:
       type: object
-      required: [code, message, correlation_id]
       additionalProperties: false
+      required: [code, message, request_id, retryable]
       properties:
         code: {type: string}
         message: {type: string}
-        correlation_id: {type: string}
-        details: {type: object}
-    OAuthSafeResult:
-      type: object
-      required: [status, expires_at, granted_scopes, author_urn, api_version]
-      additionalProperties: false
-      properties:
-        status: {type: string, enum: [connected_for_stage0, CONNECTED]}
-        expires_at: {type: string, format: date-time}
-        granted_scopes: {type: array, items: {type: string}}
-        author_urn: {type: string, pattern: "^urn:li:person:"}
-        api_version: {type: string, pattern: "^[0-9]{6}$"}
-        requires_live_author_validation: {type: boolean}
-    IntegrationStatus:
-      type: object
-      required: [status, api_version, capabilities]
-      properties:
-        status: {type: string, enum: [DISCONNECTED, CONNECTED, EXPIRING, AUTH_REQUIRED, REVOKED, MISCONFIGURED]}
-        token_expires_at: {type: [string, "null"], format: date-time}
-        api_version: {type: string}
-        author_urn_present: {type: boolean}
-        capabilities: {type: object, additionalProperties: {type: boolean}}
-    SourceCreate:
-      type: object
-      required: [source_type, content_hash, visibility]
-      properties:
-        source_type: {type: string}
-        canonical_url: {type: [string, "null"], format: uri}
-        title: {type: [string, "null"]}
-        raw_content: {type: [string, "null"]}
-        content_hash: {type: string}
-        trust_level: {type: integer, minimum: 0, maximum: 5}
-        visibility: {type: string, enum: [PUBLIC, INTERNAL, PRIVATE]}
-        metadata: {type: object}
-    ContentItemCreate:
-      type: object
-      required: [topic, pillar, primary_source_id]
-      additionalProperties: false
-      properties:
-        topic: {type: string, minLength: 1}
-        pillar: {type: string, minLength: 1}
-        primary_source_id: {type: string, format: uuid}
-        scores: {type: object}
-        risk_notes: {type: array, items: {type: string}}
-    EvidencePackCreate:
-      type: object
-      required: [content_item_id, language, allowed_claim_ids, source_ids]
-      properties:
-        content_item_id: {type: string, format: uuid}
-        language: {type: string, enum: [ru, en]}
-        allowed_claim_ids: {type: array, items: {type: string}}
-        forbidden_claim_keys: {type: array, items: {type: string}}
-        source_ids: {type: array, items: {type: string, format: uuid}}
-        warnings: {type: array, items: {type: string}}
-    DraftCreate:
-      type: object
-      required: [content_item_id, evidence_pack_id, language, pillar, full_text, structured_content, used_claim_ids]
-      properties:
-        content_item_id: {type: string, format: uuid}
-        evidence_pack_id: {type: string, format: uuid}
-        parent_version_id: {type: [string, "null"], format: uuid}
-        language: {type: string, enum: [ru, en]}
-        pillar: {type: string}
-        full_text: {type: string, minLength: 1}
-        structured_content: {type: object}
-        used_claim_ids: {type: array, items: {type: string}}
-    QaSubmission:
-      type: object
-      required: [deterministic_result, deterministic_report, final_result]
-      properties:
-        deterministic_result: {type: string, enum: [PASS, PASS_WITH_WARNINGS, FAIL]}
-        deterministic_report: {type: object}
-        llm_result: {type: [string, "null"], enum: [PASS, PASS_WITH_WARNINGS, FAIL, null]}
-        llm_report: {type: [object, "null"]}
-        final_result: {type: string, enum: [PASS, PASS_WITH_WARNINGS, FAIL]}
-    ApprovalRequest:
-      type: object
-      required: [approved_by]
-      properties:
-        asset_id: {type: [string, "null"], format: uuid}
-        approved_by: {type: string}
-        accepted_warning_codes: {type: array, items: {type: string}}
-    PublicationJobCreate:
-      type: object
-      required: [approval_id, scheduled_at, visibility]
-      properties:
-        approval_id: {type: string, format: uuid}
-        scheduled_at: {type: string, format: date-time}
-        visibility: {type: string, enum: [PUBLIC]}
+        request_id: {type: string}
+        retryable: {type: boolean}
+        publication_status: {type: [string, "null"]}

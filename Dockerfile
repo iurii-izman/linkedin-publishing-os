@@ -7,8 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN useradd --create-home --uid 10001 publisher
 WORKDIR /app
 
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock README.md alembic.ini ./
 COPY src ./src
+COPY alembic ./alembic
 RUN pip install --no-cache-dir uv==0.9.30 \
     && uv sync --frozen --no-dev --no-editable
 RUN mkdir -p /var/lib/publisher/stage0 && chown -R publisher:publisher /var/lib/publisher
