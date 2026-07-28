@@ -2,7 +2,7 @@
   "name": "linkedin-publishing-os",
   "version": "0.2.0",
   "generated_at": "2026-07-28",
-  "stage": "stage1-ready-for-controlled-live-validation",
+  "stage": "stage1-live-validated",
   "files": [
     ".env.example",
     ".dockerignore",
@@ -36,6 +36,7 @@
     "docs/12_RISKS_AND_SOURCES.md",
     "docs/13_ACCEPTANCE_CHECKLISTS.md",
     "docs/STAGE0_MANUAL_ACTIONS.md",
+    "docs/STAGE1_LIVE_VALIDATION.md",
     "docs/STAGE1_VERTICAL_MVP.md",
     "docs/adr/001-hybrid-architecture.md",
     "docs/adr/002-human-approval.md",
@@ -103,6 +104,7 @@
     "docs/00_SPEC_AUDIT_REPORT.md",
     "docs/STAGE0_MANUAL_ACTIONS.md",
     "docs/feasibility_report.md",
+    "docs/STAGE1_LIVE_VALIDATION.md",
     "docs/STAGE1_VERTICAL_MVP.md",
     "TASKS.md"
   ]

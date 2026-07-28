@@ -11,7 +11,12 @@ Status: `[ ]` not started · `[-]` in progress · `[x]` complete · `[!]` blocke
 - [x] Ambiguous final outcomes and stale `PUBLISHING` reconcile to `PUBLISH_UNCERTAIN`.
 - [x] Versioned AEAD connection import retaining the Stage 0 store.
 - [x] Owner-authenticated API, append-only audit, offline fake-adapter E2E.
-- [x] Live LinkedIn publication disabled pending controlled owner validation.
+- [x] Controlled owner-approved live text publication: one attempt, HTTP 201,
+  persisted `PUBLISHED`, idempotent replay with no additional LinkedIn call, and
+  successful manual profile verification.
+
+**Vertical slice status:** complete. Live LinkedIn publication remains disabled by
+default after validation.
 
 ## EPIC 0 — LinkedIn API feasibility gate
 

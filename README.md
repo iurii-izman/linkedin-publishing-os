@@ -44,6 +44,7 @@
 | [`docs/00_SPEC_AUDIT_REPORT.md`](docs/00_SPEC_AUDIT_REPORT.md) | Фактический аудит пакета и исправления |
 | [`docs/STAGE0_MANUAL_ACTIONS.md`](docs/STAGE0_MANUAL_ACTIONS.md) | Ручные действия владельца для безопасного spike |
 | [`docs/STAGE1_VERTICAL_MVP.md`](docs/STAGE1_VERTICAL_MVP.md) | Локальный запуск, exact approval, idempotency, recovery и controlled live checkpoint |
+| [`docs/STAGE1_LIVE_VALIDATION.md`](docs/STAGE1_LIVE_VALIDATION.md) | Подтверждённый безопасный результат controlled Stage 1 live validation |
 | [`docs/feasibility_report.md`](docs/feasibility_report.md) | Шаблон фактических результатов Stage 0 |
 | [`specs/openapi.yaml`](specs/openapi.yaml) | Целевой внутренний HTTP API |
 | [`specs/schema.sql`](specs/schema.sql) | Референсная PostgreSQL-схема |
@@ -89,6 +90,14 @@ Stage 1 запускается только после явной миграци
 безопасные CLI-команды и offline E2E описаны в
 [`docs/STAGE1_VERTICAL_MVP.md`](docs/STAGE1_VERTICAL_MVP.md). Реальная публикация
 по умолчанию заблокирована.
+
+Контролируемая Stage 1 live validation завершена 28 июля 2026 года: PostgreSQL
+сохранил exact-approved публикацию, LinkedIn вернул HTTP 201 после единственной
+попытки, idempotent replay не вызвал дополнительный LinkedIn-запрос, а владелец
+подтвердил корректное отображение и отсутствие дубликата. Безопасная запись
+результата находится в
+[`docs/STAGE1_LIVE_VALIDATION.md`](docs/STAGE1_LIVE_VALIDATION.md). Это подтверждает
+только immediate text vertical slice; live mode по-прежнему выключен по умолчанию.
 
 ## Жёсткие ограничения
 
