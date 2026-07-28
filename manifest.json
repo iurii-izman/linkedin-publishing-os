@@ -1,8 +1,8 @@
 {
   "name": "linkedin-publishing-os",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "generated_at": "2026-07-28",
-  "stage": "stage1-live-validated",
+  "stage": "stage2-ready-for-controlled-telegram-validation",
   "files": [
     ".env.example",
     ".dockerignore",
@@ -13,6 +13,7 @@
     "alembic/env.py",
     "alembic/script.py.mako",
     "alembic/versions/0001_stage1_vertical.py",
+    "alembic/versions/0002_stage2_telegram_approval.py",
     "assets/stage0/linkedin-publishing-workflow.png",
     "Dockerfile",
     "MASTER_SPEC.md",
@@ -38,6 +39,7 @@
     "docs/STAGE0_MANUAL_ACTIONS.md",
     "docs/STAGE1_LIVE_VALIDATION.md",
     "docs/STAGE1_VERTICAL_MVP.md",
+    "docs/STAGE2_TELEGRAM_ORCHESTRATION.md",
     "docs/adr/001-hybrid-architecture.md",
     "docs/adr/002-human-approval.md",
     "docs/adr/003-official-api-only.md",
@@ -51,6 +53,9 @@
     "docs/adr/011-production-token-encryption.md",
     "docs/feasibility_report.md",
     "manifest.json",
+    "n8n/workflows/manifest.json",
+    "n8n/workflows/send-telegram-approval.json",
+    "n8n/workflows/telegram-approval-decision.json",
     "ops/postgres/init/01-create-application-databases.sh",
     "prompts/00_REPOSITORY_KICKOFF.md",
     "prompts/01_STAGE1_CORE.md",
@@ -86,6 +91,10 @@
     "src/publisher_api/stage1_publisher.py",
     "src/publisher_api/stage1_schemas.py",
     "src/publisher_api/stage1_services.py",
+    "src/publisher_api/stage2_api.py",
+    "src/publisher_api/stage2_schemas.py",
+    "src/publisher_api/stage2_services.py",
+    "src/publisher_api/stage2_telegram.py",
     "src/publisher_api/token_store.py",
     "tests/conftest.py",
     "tests/test_cli.py",
@@ -96,6 +105,7 @@
     "tests/test_settings.py",
     "tests/test_stage0_image.py",
     "tests/test_stage1.py",
+    "tests/test_stage2.py",
     "uv.lock"
   ],
   "primary_documents": [
@@ -106,6 +116,7 @@
     "docs/feasibility_report.md",
     "docs/STAGE1_LIVE_VALIDATION.md",
     "docs/STAGE1_VERTICAL_MVP.md",
+    "docs/STAGE2_TELEGRAM_ORCHESTRATION.md",
     "TASKS.md"
   ]
 }

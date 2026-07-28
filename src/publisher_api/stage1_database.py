@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from publisher_api.settings import Settings
 
-STAGE1_ALEMBIC_REVISION = "0001_stage1_vertical"
+STAGE1_ALEMBIC_REVISION = "0002_stage2_telegram"
 SessionFactory = Callable[[], Session]
 
 

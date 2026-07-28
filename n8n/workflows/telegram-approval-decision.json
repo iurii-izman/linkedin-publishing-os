@@ -1,0 +1,237 @@
+{
+  "name": "LPOS - Telegram Approval Decision",
+  "active": false,
+  "nodes": [
+    {
+      "id": "telegram-callback",
+      "name": "Telegram Callback",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_AT_IMPORT",
+          "name": "Telegram runtime credential"
+        }
+      },
+      "parameters": {
+        "updates": ["callback_query"]
+      }
+    },
+    {
+      "id": "verify-owner",
+      "name": "Verify Owner And Freeze Keys",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0],
+      "parameters": {
+        "jsCode": "const q=$json.callback_query; const expectedUser=String($env.TELEGRAM_OWNER_USER_ID); const expectedChat=String($env.TELEGRAM_OWNER_CHAT_ID); if(String(q.from.id)!==expectedUser||String(q.message.chat.id)!==expectedChat){throw new Error('TELEGRAM_OWNER_FORBIDDEN');} const [action,token]=String(q.data).split(':',2); if(!token||!['approve','reject'].includes(action)){throw new Error('INVALID_CALLBACK');} const stable='telegram-decision-'+q.id; return [{json:{request_id:null,callback_token:token,decision:action==='approve'?'APPROVE_AND_PUBLISH':'REJECT',telegram_user_id:q.from.id,telegram_chat_id:q.message.chat.id,callback_query_id:q.id,message_external_id:String(q.message.message_id),decision_key:stable,prepare_key:'telegram-prepare-'+q.id,execute_key:'telegram-execute-'+q.id}}];"
+      }
+    },
+    {
+      "id": "ack-callback",
+      "name": "Acknowledge Callback",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [480, -120],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_AT_IMPORT",
+          "name": "Telegram runtime credential"
+        }
+      },
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $json.callback_query_id }}"
+      }
+    },
+    {
+      "id": "apply-decision",
+      "name": "Apply Persisted Decision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 80],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PUBLISHER_API_INTERNAL_URL + '/v1/orchestration/approval-decisions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "X-N8N-Service-Key", "value": "={{ $env.N8N_SERVICE_KEY }}"},
+            {"name": "Idempotency-Key", "value": "={{ $json.decision_key }}"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({callback_token:$json.callback_token,telegram_user_id:$json.telegram_user_id,telegram_chat_id:$json.telegram_chat_id,decision:$json.decision,callback_query_id:$json.callback_query_id,message_external_id:$json.message_external_id}) }}",
+        "options": {"timeout": 10000}
+      }
+    },
+    {
+      "id": "approved",
+      "name": "Approve And Publish?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [720, 80],
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true},
+          "conditions": [
+            {
+              "leftValue": "={{ $json.next_action }}",
+              "rightValue": "PREPARE",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "prepare",
+      "name": "Prepare Publication",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PUBLISHER_API_INTERNAL_URL + '/v1/orchestration/approval-requests/' + $json.request_id + '/prepare' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "X-N8N-Service-Key", "value": "={{ $env.N8N_SERVICE_KEY }}"},
+            {"name": "Idempotency-Key", "value": "={{ $('Verify Owner And Freeze Keys').item.json.prepare_key }}"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"connection_id\":\"{{ $env.LINKEDIN_CONNECTION_ID }}\"}",
+        "options": {"timeout": 10000}
+      }
+    },
+    {
+      "id": "execute",
+      "name": "Execute Once",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 0],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PUBLISHER_API_INTERNAL_URL + '/v1/orchestration/publications/' + $json.id + '/execute' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "X-N8N-Service-Key", "value": "={{ $env.N8N_SERVICE_KEY }}"},
+            {"name": "Idempotency-Key", "value": "={{ $('Verify Owner And Freeze Keys').item.json.execute_key }}"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({approval_request_id:$('Apply Persisted Decision').item.json.request_id,confirm_execute:true}) }}",
+        "options": {"timeout": 30000}
+      }
+    },
+    {
+      "id": "get-result",
+      "name": "Read Persisted Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 0],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.PUBLISHER_API_INTERNAL_URL + '/v1/orchestration/publications/' + $('Prepare Publication').item.json.id + '/result' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "X-N8N-Service-Key", "value": "={{ $env.N8N_SERVICE_KEY }}"}
+          ]
+        },
+        "options": {"timeout": 10000}
+      }
+    },
+    {
+      "id": "update-result",
+      "name": "Update Telegram Result",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1680, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_AT_IMPORT",
+          "name": "Telegram runtime credential"
+        }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "editMessageText",
+        "chatId": "={{ $env.TELEGRAM_OWNER_CHAT_ID }}",
+        "messageId": "={{ $('Verify Owner And Freeze Keys').item.json.message_external_id }}",
+        "text": "={{ $json.status === 'PUBLISH_UNCERTAIN' ? 'PUBLISH_UNCERTAIN — retry forbidden; check the profile manually.' : $json.status }}"
+      }
+    },
+    {
+      "id": "persist-result-delivery",
+      "name": "Persist Result Delivery",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PUBLISHER_API_INTERNAL_URL + '/v1/orchestration/approval-requests/' + $('Apply Persisted Decision').item.json.request_id + '/delivery-result' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "X-N8N-Service-Key", "value": "={{ $env.N8N_SERVICE_KEY }}"},
+            {"name": "Idempotency-Key", "value": "={{ 'telegram-result-' + $('Apply Persisted Decision').item.json.request_id }}"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({phase:'RESULT',delivery_status:'SENT',message_external_id:$('Verify Owner And Freeze Keys').item.json.message_external_id}) }}",
+        "options": {"timeout": 10000}
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Callback": {
+      "main": [[{"node": "Verify Owner And Freeze Keys", "type": "main", "index": 0}]]
+    },
+    "Verify Owner And Freeze Keys": {
+      "main": [[
+        {"node": "Acknowledge Callback", "type": "main", "index": 0},
+        {"node": "Apply Persisted Decision", "type": "main", "index": 0}
+      ]]
+    },
+    "Apply Persisted Decision": {
+      "main": [[{"node": "Approve And Publish?", "type": "main", "index": 0}]]
+    },
+    "Approve And Publish?": {
+      "main": [
+        [{"node": "Prepare Publication", "type": "main", "index": 0}],
+        [{"node": "Update Telegram Result", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare Publication": {
+      "main": [[{"node": "Execute Once", "type": "main", "index": 0}]]
+    },
+    "Execute Once": {
+      "main": [
+        [{"node": "Update Telegram Result", "type": "main", "index": 0}],
+        [{"node": "Read Persisted Result", "type": "main", "index": 0}]
+      ]
+    },
+    "Read Persisted Result": {
+      "main": [[{"node": "Update Telegram Result", "type": "main", "index": 0}]]
+    },
+    "Update Telegram Result": {
+      "main": [[{"node": "Persist Result Delivery", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none"
+  },
+  "tags": []
+}

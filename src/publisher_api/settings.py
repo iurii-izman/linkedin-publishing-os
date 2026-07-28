@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import secrets
 from pathlib import Path
 from urllib.parse import unquote_plus
 
@@ -71,6 +72,11 @@ class Settings(BaseSettings):
     live_linkedin_publishing_enabled: bool = False
     linkedin_publisher_mode: str = "disabled"
     stale_publication_seconds: int = Field(default=300, ge=30, le=86400)
+    telegram_bot_enabled: bool = False
+    telegram_owner_user_id: int | None = None
+    telegram_owner_chat_id: int | None = None
+    n8n_service_key: SecretStr | None = None
+    approval_request_ttl_seconds: int = Field(default=900, ge=60, le=86400)
 
     @field_validator("linkedin_api_version")
     @classmethod
@@ -86,6 +92,11 @@ class Settings(BaseSettings):
         if set(scopes) != STAGE0_REQUIRED_SCOPES:
             raise ValueError("Stage 0 scopes must be exactly: openid profile w_member_social")
         return " ".join(STAGE0_REQUIRED_SCOPE_ORDER)
+
+    @field_validator("telegram_owner_user_id", "telegram_owner_chat_id", mode="before")
+    @classmethod
+    def blank_telegram_identity_is_unset(cls, value: object) -> object:
+        return None if value == "" else value
 
     @model_validator(mode="after")
     def validate_urls_and_secrets(self) -> Settings:
@@ -138,6 +149,17 @@ class Settings(BaseSettings):
             raise ValueError("LINKEDIN_PUBLISHER_MODE is unsupported")
         if self.app_env == "production" and self.linkedin_publisher_mode.startswith("fake-"):
             raise ValueError("fake LinkedIn publishers are forbidden in production")
+        if self.n8n_service_key is not None:
+            service_key = self.n8n_service_key.get_secret_value()
+            if not service_key or service_key.startswith("change-me") or len(service_key) < 32:
+                raise ValueError("N8N_SERVICE_KEY must contain at least 32 configured characters")
+            if secrets.compare_digest(service_key, self.owner_key.get_secret_value()):
+                raise ValueError("N8N_SERVICE_KEY must differ from APP_OWNER_KEY")
+        telegram_values = (self.telegram_owner_user_id, self.telegram_owner_chat_id)
+        if any(value is not None for value in telegram_values) and not all(
+            value is not None for value in telegram_values
+        ):
+            raise ValueError("Both Telegram owner user and chat IDs must be configured together")
         return self
 
     @property

@@ -18,6 +18,17 @@ Status: `[ ]` not started · `[-]` in progress · `[x]` complete · `[!]` blocke
 **Vertical slice status:** complete. Live LinkedIn publication remains disabled by
 default after validation.
 
+## Stage 2 Telegram orchestration checkpoint
+
+- [x] PostgreSQL external approval request lifecycle and delivery metadata.
+- [x] Opaque one-time callback token stored only as SHA-256.
+- [x] Exact current-revision binding, expiry, invalidation and decision replay.
+- [x] Independent FastAPI verification of Telegram owner user and chat IDs.
+- [x] Dedicated n8n service authentication, distinct from owner authentication.
+- [x] Sanitized send/decision workflow exports with no LinkedIn boundary access.
+- [x] Offline approve, reject, expiry, stale-revision and lost-response E2E.
+- [ ] Controlled real Telegram validation with one message and one owner callback.
+
 ## EPIC 0 — LinkedIn API feasibility gate
 
 ### Stage 0 preparation (repository work)

@@ -34,6 +34,8 @@ from publisher_api.stage1_domain import DomainError
 from publisher_api.stage1_logging import safe_log
 from publisher_api.stage1_publisher import TextPublisher, configured_publisher
 from publisher_api.stage1_services import Stage1Services
+from publisher_api.stage2_api import create_stage2_router
+from publisher_api.stage2_services import Stage2Services
 from publisher_api.token_store import EncryptedConnectionStore, StoredConnection
 
 
@@ -63,6 +65,7 @@ def create_app(
     sessions = create_session_factory(database_engine)
     publisher = stage1_publisher or configured_publisher(active_settings)
     stage1 = Stage1Services(sessions, active_settings, publisher)
+    stage2 = Stage2Services(sessions, active_settings, stage1)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -233,7 +236,9 @@ def create_app(
         )
 
     app.include_router(create_stage1_router(active_settings, stage1))
+    app.include_router(create_stage2_router(active_settings, stage2))
     app.state.stage1_services = stage1
+    app.state.stage2_services = stage2
     app.state.database_engine = database_engine
     app.state.stage1_publisher = publisher
     return app

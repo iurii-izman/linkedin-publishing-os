@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "workflows": [
+    {
+      "file": "send-telegram-approval.json",
+      "purpose": "Fetch the exact FastAPI preview and deliver one Telegram approval message."
+    },
+    {
+      "file": "telegram-approval-decision.json",
+      "purpose": "Validate the owner callback, persist the decision, and orchestrate prepare/execute."
+    }
+  ],
+  "credentials_embedded": false,
+  "direct_linkedin_calls": false,
+  "domain_state_owner": "publisher-api"
+}

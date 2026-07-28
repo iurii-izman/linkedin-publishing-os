@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -237,4 +238,109 @@ class IdempotencyRecord(Base):
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
     resource_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ExternalApprovalRequest(Base):
+    __tablename__ = "external_approval_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PENDING','APPROVED','REJECTED','EXPIRED','INVALIDATED','CONSUMED')",
+            name="ck_external_approval_status",
+        ),
+        CheckConstraint(
+            "decision IS NULL OR decision IN ('APPROVE_AND_PUBLISH','REJECT')",
+            name="ck_external_approval_decision",
+        ),
+        CheckConstraint("length(revision_sha256) = 64", name="ck_external_approval_revision_sha"),
+        CheckConstraint(
+            "length(approval_fingerprint) = 64",
+            name="ck_external_approval_fingerprint",
+        ),
+        CheckConstraint(
+            "length(callback_token_hash) = 64",
+            name="ck_external_approval_callback_hash",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    draft_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("drafts.id"), nullable=False
+    )
+    revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("post_revisions.id"), nullable=False, index=True
+    )
+    revision_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    approval_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    channel: Mapped[str] = mapped_column(String(32), nullable=False, default="TELEGRAM")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    callback_token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    telegram_owner_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    telegram_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    requested_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decision_actor_id: Mapped[str | None] = mapped_column(String(200))
+    decision: Mapped[str | None] = mapped_column(String(32))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    invalidation_reason: Mapped[str | None] = mapped_column(String(300))
+    message_external_id: Mapped[str | None] = mapped_column(String(200))
+    approval_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("approvals.id")
+    )
+    publication_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("publications.id")
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    decision_idempotency_key: Mapped[str | None] = mapped_column(String(128), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+Index(
+    "ix_external_approval_status_expiry",
+    ExternalApprovalRequest.status,
+    ExternalApprovalRequest.expires_at,
+)
+Index(
+    "ix_external_approval_telegram_owner_chat",
+    ExternalApprovalRequest.telegram_owner_user_id,
+    ExternalApprovalRequest.telegram_chat_id,
+)
+Index(
+    "uq_external_approval_pending_revision_channel",
+    ExternalApprovalRequest.revision_id,
+    ExternalApprovalRequest.channel,
+    unique=True,
+    postgresql_where=ExternalApprovalRequest.status == "PENDING",
+)
+
+
+class TelegramDelivery(Base):
+    __tablename__ = "telegram_deliveries"
+    __table_args__ = (
+        CheckConstraint(
+            "delivery_status IN ('SENT','FAILED')",
+            name="ck_telegram_delivery_status",
+        ),
+        CheckConstraint("attempts = 1", name="ck_telegram_delivery_single_attempt"),
+        UniqueConstraint("approval_request_id", "phase", name="uq_telegram_delivery_request_phase"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    approval_request_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("external_approval_requests.id"), nullable=False
+    )
+    phase: Mapped[str] = mapped_column(String(20), nullable=False)
+    delivery_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    message_external_id: Mapped[str | None] = mapped_column(String(200))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    safe_error_category: Mapped[str | None] = mapped_column(String(100))
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

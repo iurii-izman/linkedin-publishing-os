@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: LinkedIn Publishing OS
-  version: 0.2.0
+  version: 0.3.0
   description: >
     Owner-only Stage 1 vertical API. All publication execution is disabled unless
     an explicit non-production fake adapter or separately approved live capability
@@ -254,6 +254,160 @@ paths:
                 type: array
                 items: {$ref: "#/components/schemas/AuditEvent"}
         "404": {$ref: "#/components/responses/NotFound"}
+  /v1/revisions/{revision_id}/external-approval-requests:
+    post:
+      operationId: createExternalApprovalRequest
+      parameters:
+        - {$ref: "#/components/parameters/RevisionId"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ExternalApprovalRequestCreate"}
+      responses:
+        "201":
+          description: Exact external approval request created; callback token returned once
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExternalApprovalRequest"}
+        "200":
+          description: Idempotent replay without callback token
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExternalApprovalRequest"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/external-approval-requests/{request_id_value}:
+    get:
+      operationId: getExternalApprovalRequest
+      parameters:
+        - {$ref: "#/components/parameters/ExternalApprovalRequestId"}
+      responses:
+        "200":
+          description: Safe persisted approval request
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExternalApprovalRequest"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /v1/external-approval-requests/{request_id_value}/invalidate:
+    post:
+      operationId: invalidateExternalApprovalRequest
+      parameters:
+        - {$ref: "#/components/parameters/ExternalApprovalRequestId"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ExternalApprovalInvalidate"}
+      responses:
+        "200":
+          description: Persisted invalidated request
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExternalApprovalRequest"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/orchestration/approval-requests/{request_id_value}/preview:
+    get:
+      security: [{N8NServiceKey: []}]
+      operationId: getOrchestrationApprovalPreview
+      parameters:
+        - {$ref: "#/components/parameters/ExternalApprovalRequestId"}
+      responses:
+        "200":
+          description: Server-built exact Telegram preview
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TelegramPreview"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/orchestration/approval-decisions:
+    post:
+      security: [{N8NServiceKey: []}]
+      operationId: applyOrchestrationApprovalDecision
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApprovalDecisionCreate"}
+      responses:
+        "200":
+          description: Persisted one-time decision
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApprovalDecision"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/orchestration/approval-requests/{request_id_value}/delivery-result:
+    post:
+      security: [{N8NServiceKey: []}]
+      operationId: recordTelegramDeliveryResult
+      parameters:
+        - {$ref: "#/components/parameters/ExternalApprovalRequestId"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TelegramDeliveryResult"}
+      responses:
+        "200": {description: Delivery result persisted}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/orchestration/approval-requests/{request_id_value}/prepare:
+    post:
+      security: [{N8NServiceKey: []}]
+      operationId: prepareOrchestratedPublication
+      parameters:
+        - {$ref: "#/components/parameters/ExternalApprovalRequestId"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/OrchestrationPrepare"}
+      responses:
+        "200":
+          description: Prepared or replayed publication
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Publication"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/orchestration/publications/{publication_id}/execute:
+    post:
+      security: [{N8NServiceKey: []}]
+      operationId: executeOrchestratedPublication
+      parameters:
+        - {$ref: "#/components/parameters/PublicationId"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/OrchestrationExecute"}
+      responses:
+        "200":
+          description: Persisted publication result; replay never calls LinkedIn again
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Publication"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /v1/orchestration/publications/{publication_id}/result:
+    get:
+      security: [{N8NServiceKey: []}]
+      operationId: getOrchestratedPublicationResult
+      parameters:
+        - {$ref: "#/components/parameters/PublicationId"}
+      responses:
+        "200":
+          description: Safe persisted publication result
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Publication"}
+        "403": {$ref: "#/components/responses/Forbidden"}
 components:
   securitySchemes:
     OwnerKey:
@@ -265,6 +419,11 @@ components:
       type: apiKey
       in: header
       name: X-Stage0-Owner-Key
+    N8NServiceKey:
+      type: apiKey
+      in: header
+      name: X-N8N-Service-Key
+      description: Dedicated runtime service credential; never embedded in workflows.
   parameters:
     IdempotencyKey:
       in: header
@@ -289,6 +448,11 @@ components:
     PublicationId:
       in: path
       name: publication_id
+      required: true
+      schema: {type: string, format: uuid}
+    ExternalApprovalRequestId:
+      in: path
+      name: request_id_value
       required: true
       schema: {type: string, format: uuid}
   responses:
@@ -459,6 +623,109 @@ components:
         request_id: {type: string}
         occurred_at: {type: string, format: date-time}
         safe_metadata: {type: object}
+    ExternalApprovalRequestCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        requested_by: {type: string, minLength: 1, maxLength: 200}
+    ExternalApprovalInvalidate:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 1, maxLength: 300}
+    ExternalApprovalRequest:
+      type: object
+      required:
+        [id, draft_id, revision_id, status, channel, revision_sha256_prefix,
+         approval_fingerprint, expires_at, replayed]
+      properties:
+        id: {type: string, format: uuid}
+        draft_id: {type: string, format: uuid}
+        revision_id: {type: string, format: uuid}
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, EXPIRED, INVALIDATED, CONSUMED]
+        channel: {type: string, const: TELEGRAM}
+        revision_sha256_prefix: {type: string, minLength: 12, maxLength: 12}
+        approval_fingerprint: {type: string, pattern: "^[0-9a-f]{64}$"}
+        expires_at: {type: string, format: date-time}
+        decision: {type: [string, "null"]}
+        approval_id: {type: [string, "null"], format: uuid}
+        publication_id: {type: [string, "null"], format: uuid}
+        callback_token:
+          type: [string, "null"]
+          description: Opaque one-time value returned only on initial creation.
+        replayed: {type: boolean}
+        preview:
+          oneOf:
+            - {$ref: "#/components/schemas/TelegramPreview"}
+            - {type: "null"}
+    TelegramPreview:
+      type: object
+      required:
+        [request_id, revision_number, exact_text, text_length,
+         revision_sha256_prefix, expires_at, actions, warning]
+      properties:
+        request_id: {type: string, format: uuid}
+        draft_title: {type: [string, "null"]}
+        revision_number: {type: integer, minimum: 1}
+        exact_text: {type: string}
+        text_length: {type: integer, minimum: 1}
+        revision_sha256_prefix: {type: string, minLength: 12, maxLength: 12}
+        expires_at: {type: string, format: date-time}
+        actions:
+          type: array
+          items: {type: string, enum: [APPROVE_AND_PUBLISH, REJECT]}
+        warning: {type: string}
+    ApprovalDecisionCreate:
+      type: object
+      additionalProperties: false
+      required:
+        [callback_token, telegram_user_id, telegram_chat_id, decision,
+         callback_query_id]
+      properties:
+        callback_token: {type: string, writeOnly: true}
+        telegram_user_id: {type: integer}
+        telegram_chat_id: {type: integer}
+        decision: {type: string, enum: [APPROVE_AND_PUBLISH, REJECT]}
+        callback_query_id: {type: string, minLength: 1, maxLength: 200}
+        message_external_id: {type: [string, "null"], maxLength: 200}
+    ApprovalDecision:
+      type: object
+      required: [request_id, status, decision, next_action, replayed]
+      properties:
+        request_id: {type: string, format: uuid}
+        status:
+          type: string
+          enum: [APPROVED, REJECTED, CONSUMED]
+        decision: {type: string, enum: [APPROVE_AND_PUBLISH, REJECT]}
+        approval_id: {type: [string, "null"], format: uuid}
+        publication_id: {type: [string, "null"], format: uuid}
+        next_action: {type: string, enum: [PREPARE, STOP, GET_RESULT]}
+        replayed: {type: boolean}
+    TelegramDeliveryResult:
+      type: object
+      additionalProperties: false
+      required: [phase, delivery_status]
+      properties:
+        phase: {type: string, enum: [PREVIEW, RESULT]}
+        delivery_status: {type: string, enum: [SENT, FAILED]}
+        message_external_id: {type: [string, "null"], maxLength: 200}
+        safe_error_category: {type: [string, "null"], maxLength: 100}
+    OrchestrationPrepare:
+      type: object
+      additionalProperties: false
+      required: [connection_id]
+      properties:
+        connection_id: {type: string, format: uuid}
+    OrchestrationExecute:
+      type: object
+      additionalProperties: false
+      required: [approval_request_id, confirm_execute]
+      properties:
+        approval_request_id: {type: string, format: uuid}
+        confirm_execute: {type: boolean, const: true}
     Error:
       type: object
       additionalProperties: false

@@ -27,6 +27,7 @@ from publisher_api.stage1_models import (
     Approval,
     AuditEvent,
     Draft,
+    ExternalApprovalRequest,
     IdempotencyRecord,
     LinkedInConnection,
     PostRevision,
@@ -255,6 +256,35 @@ class RevisionService:
             session.flush()
             draft.current_revision_id = revision.id
             draft.updated_at = utc_now()
+            pending_requests = list(
+                session.scalars(
+                    select(ExternalApprovalRequest)
+                    .where(
+                        ExternalApprovalRequest.draft_id == draft.id,
+                        ExternalApprovalRequest.revision_id != revision.id,
+                        ExternalApprovalRequest.status == "PENDING",
+                    )
+                    .with_for_update()
+                )
+            )
+            for pending in pending_requests:
+                pending.status = "INVALIDATED"
+                pending.invalidated_at = utc_now()
+                pending.invalidation_reason = "current revision changed"
+                pending.updated_at = utc_now()
+                AuditService.record(
+                    session,
+                    aggregate_type="DRAFT",
+                    aggregate_id=draft.id,
+                    event_type="EXTERNAL_APPROVAL_INVALIDATED",
+                    actor_id=created_by,
+                    request_id=request_id,
+                    safe_metadata={
+                        "approval_request_id": str(pending.id),
+                        "revision_id": str(pending.revision_id),
+                        "reason": "current revision changed",
+                    },
+                )
             _remember_idempotency(
                 session,
                 scope=scope,
@@ -311,36 +341,59 @@ class ApprovalService:
         idempotency_key: str,
         request_id: str,
     ) -> tuple[Approval, bool]:
+        with transactional_session(self._sessions) as session:
+            return self.approve_in_session(
+                session,
+                revision_id=revision_id,
+                approved_by=approved_by,
+                idempotency_key=idempotency_key,
+                request_id=request_id,
+            )
+
+    def approve_in_session(
+        self,
+        session: Session,
+        *,
+        revision_id: uuid.UUID,
+        approved_by: str,
+        idempotency_key: str,
+        request_id: str,
+    ) -> tuple[Approval, bool]:
         request_fingerprint = stable_fingerprint(
             {"revision_id": str(revision_id), "approved_by": approved_by}
         )
-        with transactional_session(self._sessions) as session:
-            existing_id = _idempotent_resource(
-                session,
-                scope="approval:create",
-                key=idempotency_key,
-                fingerprint=request_fingerprint,
+        existing_id = _idempotent_resource(
+            session,
+            scope="approval:create",
+            key=idempotency_key,
+            fingerprint=request_fingerprint,
+        )
+        if existing_id is not None:
+            existing = session.get(Approval, existing_id)
+            if existing is None:
+                raise _not_found("Approval")
+            return existing, True
+        revision = session.get(PostRevision, revision_id)
+        if revision is None:
+            raise _not_found("Revision")
+        draft = session.scalar(select(Draft).where(Draft.id == revision.draft_id).with_for_update())
+        if draft is None:
+            raise _not_found("Draft")
+        if draft.current_revision_id != revision.id:
+            raise DomainError(
+                "STALE_REVISION",
+                "Only the current revision can be approved",
+                status_code=409,
             )
-            if existing_id is not None:
-                existing = session.get(Approval, existing_id)
-                if existing is None:
-                    raise _not_found("Approval")
-                return existing, True
-            revision = session.get(PostRevision, revision_id)
-            if revision is None:
-                raise _not_found("Revision")
-            draft = session.scalar(
-                select(Draft).where(Draft.id == revision.draft_id).with_for_update()
+        exact_fingerprint = approval_fingerprint(str(revision.id), revision.text_sha256)
+        approval = session.scalar(
+            select(Approval).where(
+                Approval.approval_fingerprint == exact_fingerprint,
+                Approval.revoked_at.is_(None),
             )
-            if draft is None:
-                raise _not_found("Draft")
-            if draft.current_revision_id != revision.id:
-                raise DomainError(
-                    "STALE_REVISION",
-                    "Only the current revision can be approved",
-                    status_code=409,
-                )
-            exact_fingerprint = approval_fingerprint(str(revision.id), revision.text_sha256)
+        )
+        replayed = approval is not None
+        if approval is None:
             approval = Approval(
                 revision_id=revision.id,
                 revision_sha256=revision.text_sha256,
@@ -350,14 +403,15 @@ class ApprovalService:
             )
             session.add(approval)
             session.flush()
-            _remember_idempotency(
-                session,
-                scope="approval:create",
-                key=idempotency_key,
-                fingerprint=request_fingerprint,
-                resource_type="APPROVAL",
-                resource_id=approval.id,
-            )
+        _remember_idempotency(
+            session,
+            scope="approval:create",
+            key=idempotency_key,
+            fingerprint=request_fingerprint,
+            resource_type="APPROVAL",
+            resource_id=approval.id,
+        )
+        if not replayed:
             AuditService.record(
                 session,
                 aggregate_type="DRAFT",
@@ -372,7 +426,7 @@ class ApprovalService:
                     "approval_fingerprint": exact_fingerprint,
                 },
             )
-            return approval, False
+        return approval, replayed
 
     def revoke(
         self,

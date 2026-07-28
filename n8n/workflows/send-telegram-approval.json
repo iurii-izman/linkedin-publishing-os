@@ -1,0 +1,132 @@
+{
+  "name": "LPOS - Send Telegram Approval",
+  "active": false,
+  "nodes": [
+    {
+      "id": "approval-input",
+      "name": "Approval Input",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lpos/internal/send-approval",
+        "responseMode": "lastNode"
+      }
+    },
+    {
+      "id": "get-preview",
+      "name": "Get Exact Preview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.PUBLISHER_API_INTERNAL_URL + '/v1/orchestration/approval-requests/' + $json.body.approval_request_id + '/preview' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Service-Key",
+              "value": "={{ $env.N8N_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "send-preview",
+      "name": "Send Exact Telegram Preview",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [480, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_AT_IMPORT",
+          "name": "Telegram runtime credential"
+        }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_OWNER_CHAT_ID }}",
+        "text": "=Approval required\n\nDraft: {{ $json.draft_title || 'Untitled draft' }}\nRevision: {{ $json.revision_number }}\nCharacters: {{ $json.text_length }}\nSHA-256: {{ $json.revision_sha256_prefix }}…\nExpires: {{ $json.expires_at }}\n\n{{ $json.exact_text }}\n\nPublishing starts immediately after approval.",
+        "additionalFields": {
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "Approve & Publish",
+                      "additionalFields": {
+                        "callback_data": "={{ 'approve:' + $('Approval Input').item.json.body.callback_token }}"
+                      }
+                    },
+                    {
+                      "text": "Reject",
+                      "additionalFields": {
+                        "callback_data": "={{ 'reject:' + $('Approval Input').item.json.body.callback_token }}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "record-delivery",
+      "name": "Persist Preview Delivery",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PUBLISHER_API_INTERNAL_URL + '/v1/orchestration/approval-requests/' + $('Approval Input').item.json.body.approval_request_id + '/delivery-result' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-Service-Key",
+              "value": "={{ $env.N8N_SERVICE_KEY }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ 'telegram-preview-' + $('Approval Input').item.json.body.approval_request_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"phase\":\"PREVIEW\",\"delivery_status\":\"SENT\",\"message_external_id\":String($json.result.message_id)}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Approval Input": {
+      "main": [[{"node": "Get Exact Preview", "type": "main", "index": 0}]]
+    },
+    "Get Exact Preview": {
+      "main": [[{"node": "Send Exact Telegram Preview", "type": "main", "index": 0}]]
+    },
+    "Send Exact Telegram Preview": {
+      "main": [[{"node": "Persist Preview Delivery", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none"
+  },
+  "tags": []
+}

@@ -30,6 +30,20 @@ readiness.
 
 At least local development and production. Live tests use clearly labeled controlled posts; configuration and secrets are separate.
 
+## Stage 2 n8n operations
+
+n8n uses its separate PostgreSQL database/user and named volume. It never reads the
+publisher application schema. Configure the Telegram credential and
+`N8N_SERVICE_KEY` only at runtime; workflow exports remain inactive and sanitized.
+Keep `TELEGRAM_BOT_ENABLED=false` until controlled validation.
+
+Back up the n8n database and volume with the matching `N8N_ENCRYPTION_KEY` held in
+the external secret manager. Restore into an isolated environment and verify
+credential decryption, `/healthz`, workflow imports and publisher `/ready` before
+enabling Telegram triggers. An n8n crash after execute is recovered by reading the
+persisted publication result with the original idempotency key; never create a new
+execute key or retry LinkedIn.
+
 ## 3. Health
 
 `/health` checks process only. `/ready` checks DB, migration revision, encryption service, storage and settings. LinkedIn availability is a separate status and must not make the app unready.

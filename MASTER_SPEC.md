@@ -406,6 +406,11 @@ API, DB, OAuth, immutable drafts, approval, schedule, text publisher, audit, out
 
 Source intake, evidence, structured generation, QA and Telegram approval.
 
+The first Stage 2 vertical slice is narrower: PostgreSQL-backed exact Telegram
+approval and n8n orchestration of immediate publication only. Scheduler, source
+intake and AI generation remain excluded until this callback and replay boundary is
+validated independently.
+
 ### Stage 3 — media
 
 Image and PDF/document.
