@@ -27,7 +27,12 @@ default after validation.
 - [x] Dedicated n8n service authentication, distinct from owner authentication.
 - [x] Sanitized send/decision workflow exports with no LinkedIn boundary access.
 - [x] Offline approve, reject, expiry, stale-revision and lost-response E2E.
-- [ ] Controlled real Telegram validation with one message and one owner callback.
+- [x] Controlled real Telegram validation with one message, one accepted owner
+  callback, one LinkedIn attempt, HTTP 201, persisted `PUBLISHED` result and
+  successful manual profile verification.
+
+**Stage 2 status:** controlled vertical slice complete. LinkedIn live mode,
+Telegram webhook and n8n workflows remain disabled after validation.
 
 ## EPIC 0 — LinkedIn API feasibility gate
 

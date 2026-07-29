@@ -81,6 +81,12 @@ callback, verifies the owner, persists the decision and uses one frozen prepare 
 and one frozen execute key. If the execute response is lost, it reads the persisted
 publication result instead of generating a second key.
 
+The exported trigger node names are URL-safe (`approval-input` and
+`telegram-callback`) because current n8n production webhook paths include the node
+name. In the Telegram send node, `replyMarkup` and `inlineKeyboard` are top-level
+node parameters; `additionalFields` only disables n8n attribution. This preserves
+the two callback buttons after a sanitized workflow import.
+
 ## Result UX
 
 - `PUBLISHED`: show the status, safe timestamp and whether a post identifier exists.

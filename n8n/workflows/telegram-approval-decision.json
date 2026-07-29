@@ -4,7 +4,7 @@
   "nodes": [
     {
       "id": "telegram-callback",
-      "name": "Telegram Callback",
+      "name": "telegram-callback",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.2,
       "position": [0, 0],
@@ -194,7 +194,7 @@
     }
   ],
   "connections": {
-    "Telegram Callback": {
+    "telegram-callback": {
       "main": [[{"node": "Verify Owner And Freeze Keys", "type": "main", "index": 0}]]
     },
     "Verify Owner And Freeze Keys": {

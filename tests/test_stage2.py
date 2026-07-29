@@ -641,6 +641,29 @@ def test_workflow_reuses_one_frozen_execute_key() -> None:
     assert "retryOnFail" not in content
 
 
+def test_workflow_trigger_names_are_url_safe() -> None:
+    send_workflow = json.loads(WORKFLOW_FILES[0].read_text(encoding="utf-8"))
+    decision_workflow = json.loads(WORKFLOW_FILES[1].read_text(encoding="utf-8"))
+
+    assert send_workflow["nodes"][0]["name"] == "approval-input"
+    assert "approval-input" in send_workflow["connections"]
+    assert decision_workflow["nodes"][0]["name"] == "telegram-callback"
+    assert "telegram-callback" in decision_workflow["connections"]
+
+
+def test_send_workflow_uses_n8n_inline_keyboard_parameter_shape() -> None:
+    workflow = json.loads(WORKFLOW_FILES[0].read_text(encoding="utf-8"))
+    node = next(item for item in workflow["nodes"] if item["name"] == "Send Exact Telegram Preview")
+    parameters = node["parameters"]
+
+    assert parameters["replyMarkup"] == "inlineKeyboard"
+    assert len(parameters["inlineKeyboard"]["rows"][0]["row"]["buttons"]) == 2
+    assert parameters["additionalFields"] == {"appendAttribution": False}
+    assert "replyMarkup" not in parameters["additionalFields"]
+    assert "inlineKeyboard" not in parameters["additionalFields"]
+    assert "$('approval-input')" in json.dumps(parameters)
+
+
 def test_workflow_manifest_covers_exports() -> None:
     manifest = json.loads(Path("n8n/workflows/manifest.json").read_text(encoding="utf-8"))
     listed = {entry["file"] for entry in manifest["workflows"]}

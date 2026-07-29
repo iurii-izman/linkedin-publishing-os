@@ -47,6 +47,7 @@
 | [`docs/STAGE1_LIVE_VALIDATION.md`](docs/STAGE1_LIVE_VALIDATION.md) | Подтверждённый безопасный результат controlled Stage 1 live validation |
 | [`docs/feasibility_report.md`](docs/feasibility_report.md) | Шаблон фактических результатов Stage 0 |
 | [`docs/STAGE2_TELEGRAM_ORCHESTRATION.md`](docs/STAGE2_TELEGRAM_ORCHESTRATION.md) | Exact Telegram approval, n8n orchestration, replay protection и offline E2E |
+| [`docs/STAGE2_LIVE_VALIDATION.md`](docs/STAGE2_LIVE_VALIDATION.md) | Подтверждённый результат Telegram → n8n → LinkedIn controlled live validation |
 | [`specs/openapi.yaml`](specs/openapi.yaml) | Целевой внутренний HTTP API |
 | [`specs/schema.sql`](specs/schema.sql) | Референсная PostgreSQL-схема |
 | [`data/candidate_evidence_seed.yaml`](data/candidate_evidence_seed.yaml) | Начальная доказательная база для постов |
@@ -100,11 +101,13 @@ Stage 1 запускается только после явной миграци
 [`docs/STAGE1_LIVE_VALIDATION.md`](docs/STAGE1_LIVE_VALIDATION.md). Это подтверждает
 только immediate text vertical slice; live mode по-прежнему выключен по умолчанию.
 
-Следующий локальный slice добавляет PostgreSQL-backed Telegram approval и два
-sanitized n8n workflow. FastAPI формирует exact preview и повторно проверяет owner
-identity; n8n не хранит доменное состояние и не вызывает LinkedIn напрямую.
-Инструкция: [`docs/STAGE2_TELEGRAM_ORCHESTRATION.md`](docs/STAGE2_TELEGRAM_ORCHESTRATION.md).
-Реальные Telegram и LinkedIn вызовы до отдельного controlled validation запрещены.
+Контролируемая Stage 2 live validation завершена 29 июля 2026 года: владелец
+подтвердил exact preview в Telegram, callback создал persisted approval, n8n
+выполнил prepare/execute через FastAPI, LinkedIn вернул HTTP 201 после единственной
+попытки, а Telegram получил `PUBLISHED`. Ручная проверка профиля подтвердила
+корректные абзацы, маркеры, хэштеги и отсутствие дубликата. Безопасная запись:
+[`docs/STAGE2_LIVE_VALIDATION.md`](docs/STAGE2_LIVE_VALIDATION.md). Live endpoint,
+Telegram webhook, временный tunnel и workflows после проверки выключены.
 
 ## Жёсткие ограничения
 

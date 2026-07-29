@@ -4,7 +4,7 @@
   "nodes": [
     {
       "id": "approval-input",
-      "name": "Approval Input",
+      "name": "approval-input",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [0, 0],
@@ -54,30 +54,31 @@
         "operation": "sendMessage",
         "chatId": "={{ $env.TELEGRAM_OWNER_CHAT_ID }}",
         "text": "=Approval required\n\nDraft: {{ $json.draft_title || 'Untitled draft' }}\nRevision: {{ $json.revision_number }}\nCharacters: {{ $json.text_length }}\nSHA-256: {{ $json.revision_sha256_prefix }}…\nExpires: {{ $json.expires_at }}\n\n{{ $json.exact_text }}\n\nPublishing starts immediately after approval.",
-        "additionalFields": {
-          "replyMarkup": "inlineKeyboard",
-          "inlineKeyboard": {
-            "rows": [
-              {
-                "row": {
-                  "buttons": [
-                    {
-                      "text": "Approve & Publish",
-                      "additionalFields": {
-                        "callback_data": "={{ 'approve:' + $('Approval Input').item.json.body.callback_token }}"
-                      }
-                    },
-                    {
-                      "text": "Reject",
-                      "additionalFields": {
-                        "callback_data": "={{ 'reject:' + $('Approval Input').item.json.body.callback_token }}"
-                      }
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Approve & Publish",
+                    "additionalFields": {
+                      "callback_data": "={{ 'approve:' + $('approval-input').item.json.body.callback_token }}"
                     }
-                  ]
-                }
+                  },
+                  {
+                    "text": "Reject",
+                    "additionalFields": {
+                      "callback_data": "={{ 'reject:' + $('approval-input').item.json.body.callback_token }}"
+                    }
+                  }
+                ]
               }
-            ]
-          }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
         }
       }
     },
@@ -89,7 +90,7 @@
       "position": [720, 0],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.PUBLISHER_API_INTERNAL_URL + '/v1/orchestration/approval-requests/' + $('Approval Input').item.json.body.approval_request_id + '/delivery-result' }}",
+        "url": "={{ $env.PUBLISHER_API_INTERNAL_URL + '/v1/orchestration/approval-requests/' + $('approval-input').item.json.body.approval_request_id + '/delivery-result' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -99,7 +100,7 @@
             },
             {
               "name": "Idempotency-Key",
-              "value": "={{ 'telegram-preview-' + $('Approval Input').item.json.body.approval_request_id }}"
+              "value": "={{ 'telegram-preview-' + $('approval-input').item.json.body.approval_request_id }}"
             }
           ]
         },
@@ -113,7 +114,7 @@
     }
   ],
   "connections": {
-    "Approval Input": {
+    "approval-input": {
       "main": [[{"node": "Get Exact Preview", "type": "main", "index": 0}]]
     },
     "Get Exact Preview": {

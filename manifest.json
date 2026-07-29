@@ -1,8 +1,8 @@
 {
   "name": "linkedin-publishing-os",
-  "version": "0.3.0",
-  "generated_at": "2026-07-28",
-  "stage": "stage2-ready-for-controlled-telegram-validation",
+  "version": "0.4.0",
+  "generated_at": "2026-07-29",
+  "stage": "stage2-live-validated",
   "files": [
     ".env.example",
     ".dockerignore",
@@ -40,6 +40,7 @@
     "docs/STAGE1_LIVE_VALIDATION.md",
     "docs/STAGE1_VERTICAL_MVP.md",
     "docs/STAGE2_TELEGRAM_ORCHESTRATION.md",
+    "docs/STAGE2_LIVE_VALIDATION.md",
     "docs/adr/001-hybrid-architecture.md",
     "docs/adr/002-human-approval.md",
     "docs/adr/003-official-api-only.md",
@@ -117,6 +118,7 @@
     "docs/STAGE1_LIVE_VALIDATION.md",
     "docs/STAGE1_VERTICAL_MVP.md",
     "docs/STAGE2_TELEGRAM_ORCHESTRATION.md",
+    "docs/STAGE2_LIVE_VALIDATION.md",
     "TASKS.md"
   ]
 }
